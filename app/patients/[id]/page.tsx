@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2 } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X } from 'lucide-react'
+import ReportDisplay from '@/app/components/ReportDisplay'
 
 interface Patient {
   id: string
@@ -47,13 +48,20 @@ export default function PatientPage() {
   const [selectedStudy, setSelectedStudy] = useState<Study | null>(null)
   const [uploadProgress, setUploadProgress] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
+  const [editingStudyId, setEditingStudyId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [studyToDelete, setStudyToDelete] = useState<Study | null>(null)
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
     title: '',
     modality: '',
     imagingDatetime: new Date().toISOString().slice(0, 16),
-    files: [] as File[]
+    files: [] as File[],
+    autoGenerateTitle: false,
+    autoExtractDate: false,
+    autoExtractModality: false
   })
 
   useEffect(() => {
@@ -84,6 +92,9 @@ export default function PatientPage() {
       formData.append('title', uploadForm.title)
       formData.append('modality', uploadForm.modality)
       formData.append('imagingDatetime', uploadForm.imagingDatetime)
+      formData.append('autoGenerateTitle', uploadForm.autoGenerateTitle.toString())
+      formData.append('autoExtractDate', uploadForm.autoExtractDate.toString())
+      formData.append('autoExtractModality', uploadForm.autoExtractModality.toString())
       
       uploadForm.files.forEach((file, index) => {
         formData.append(`file${index}`, file)
@@ -102,12 +113,21 @@ export default function PatientPage() {
           title: '',
           modality: '',
           imagingDatetime: new Date().toISOString().slice(0, 16),
-          files: []
+          files: [],
+          autoGenerateTitle: false,
+          autoExtractDate: false,
+          autoExtractModality: false
         })
         setUploadProgress('')
         fetchPatient()
       } else {
-        setUploadProgress('Upload failed. Please try again.')
+        const errorData = await response.json()
+        if (errorData.requiresManualDate) {
+          setUploadProgress('Could not extract date from image. Please enter the date manually.')
+          setUploadForm({ ...uploadForm, autoExtractDate: false })
+        } else {
+          setUploadProgress(errorData.error || 'Upload failed. Please try again.')
+        }
       }
     } catch (error) {
       console.error('Error uploading study:', error)
@@ -147,6 +167,59 @@ export default function PatientPage() {
         ...uploadForm,
         files: Array.from(e.target.files)
       })
+    }
+  }
+
+  const handleStartEdit = (study: Study) => {
+    setEditingStudyId(study.id)
+    setEditingTitle(study.title)
+  }
+
+  const handleSaveEdit = async (studyId: string) => {
+    try {
+      const response = await fetch(`/api/studies/${studyId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: editingTitle })
+      })
+
+      if (response.ok) {
+        fetchPatient()
+        setEditingStudyId(null)
+        setEditingTitle('')
+      }
+    } catch (error) {
+      console.error('Error updating study:', error)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingStudyId(null)
+    setEditingTitle('')
+  }
+
+  const handleDeleteStudy = async (study: Study) => {
+    setStudyToDelete(study)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDelete = async () => {
+    if (!studyToDelete) return
+
+    try {
+      const response = await fetch(`/api/studies/${studyToDelete.id}`, {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        fetchPatient()
+        setShowDeleteConfirm(false)
+        setStudyToDelete(null)
+      }
+    } catch (error) {
+      console.error('Error deleting study:', error)
     }
   }
 
@@ -225,22 +298,82 @@ export default function PatientPage() {
             {patient.studies.map((study) => (
               <div
                 key={study.id}
-                className="bg-white rounded-lg p-4 min-w-[300px] cursor-pointer hover:shadow-md transition"
-                onClick={() => setSelectedStudy(study)}
+                className="bg-white rounded-lg p-4 min-w-[300px] hover:shadow-md transition relative group"
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {new Date(study.imagingDatetime).toLocaleDateString()}
-                  </span>
+                {/* Edit/Delete buttons */}
+                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleStartEdit(study)
+                    }}
+                    className="p-1.5 hover:bg-gray-100 rounded-lg"
+                    title="Edit title"
+                  >
+                    <Edit2 className="w-4 h-4 text-gray-600" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteStudy(study)
+                    }}
+                    className="p-1.5 hover:bg-red-50 rounded-lg"
+                    title="Delete study"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-600" />
+                  </button>
                 </div>
-                <h3 className="font-semibold">{study.title}</h3>
-                {study.modality && (
-                  <p className="text-sm text-gray-500">{study.modality}</p>
-                )}
-                <p className="text-sm text-gray-600 mt-2">{study.images.length} images</p>
-                <div className="mt-3 text-sm text-gray-700">
-                  <p className="line-clamp-3">{study.seriesSummary}</p>
+
+                <div 
+                  className="cursor-pointer"
+                  onClick={() => setSelectedStudy(study)}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-gray-600">
+                      {new Date(study.imagingDatetime).toLocaleDateString()}
+                    </span>
+                  </div>
+                  
+                  {editingStudyId === study.id ? (
+                    <div className="flex items-center gap-2 mb-2" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="text"
+                        value={editingTitle}
+                        onChange={(e) => setEditingTitle(e.target.value)}
+                        className="flex-1 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        autoFocus
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleSaveEdit(study.id)
+                        }}
+                        className="p-1 hover:bg-green-100 rounded"
+                      >
+                        <Check className="w-4 h-4 text-green-600" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleCancelEdit()
+                        }}
+                        className="p-1 hover:bg-gray-100 rounded"
+                      >
+                        <X className="w-4 h-4 text-gray-600" />
+                      </button>
+                    </div>
+                  ) : (
+                    <h3 className="font-semibold">{study.title}</h3>
+                  )}
+                  
+                  {study.modality && (
+                    <p className="text-sm text-gray-500">{study.modality}</p>
+                  )}
+                  <p className="text-sm text-gray-600 mt-2">{study.images.length} images</p>
+                  <div className="mt-3 text-sm text-gray-700">
+                    <p className="line-clamp-3">{study.seriesSummary}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -252,22 +385,7 @@ export default function PatientPage() {
       {latestReport && (
         <div className="max-w-7xl mx-auto px-4 py-4">
           <h2 className="text-lg font-semibold mb-4">Latest Report</h2>
-          <div className="bg-white rounded-lg p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold text-gray-900">Findings</h3>
-                <p className="text-gray-700 mt-1">{latestReport.geminiJson.findings}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Impression</h3>
-                <p className="text-gray-700 mt-1">{latestReport.geminiJson.impression}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900">Next Steps</h3>
-                <p className="text-gray-700 mt-1">{latestReport.geminiJson.next_steps}</p>
-              </div>
-            </div>
-          </div>
+          <ReportDisplay report={latestReport} patient={patient} />
         </div>
       )}
 
@@ -280,42 +398,79 @@ export default function PatientPage() {
             <form onSubmit={handleUploadStudy}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Title/Caption *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Title/Caption *
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={uploadForm.autoGenerateTitle}
+                        onChange={(e) => setUploadForm({ ...uploadForm, autoGenerateTitle: e.target.checked })}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600">Auto-generate title</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
-                    required
+                    required={!uploadForm.autoGenerateTitle}
+                    disabled={uploadForm.autoGenerateTitle}
                     value={uploadForm.title}
                     onChange={(e) => setUploadForm({ ...uploadForm, title: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., Chest CT with contrast"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    placeholder={uploadForm.autoGenerateTitle ? "Title will be generated based on image content" : "e.g., Chest CT with contrast"}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Modality (Optional)
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Modality (Optional)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={uploadForm.autoExtractModality}
+                        onChange={(e) => setUploadForm({ ...uploadForm, autoExtractModality: e.target.checked })}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600">Auto-detect modality</span>
+                    </label>
+                  </div>
                   <input
                     type="text"
+                    disabled={uploadForm.autoExtractModality}
                     value={uploadForm.modality}
                     onChange={(e) => setUploadForm({ ...uploadForm, modality: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., CT, MRI, X-Ray"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    placeholder={uploadForm.autoExtractModality ? "Modality will be detected from image" : "e.g., CT, MRI, X-Ray"}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Imaging Date/Time *
-                  </label>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      Imaging Date/Time *
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={uploadForm.autoExtractDate}
+                        onChange={(e) => setUploadForm({ ...uploadForm, autoExtractDate: e.target.checked })}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-600">Auto-extract date</span>
+                    </label>
+                  </div>
                   <input
                     type="datetime-local"
-                    required
+                    required={!uploadForm.autoExtractDate}
+                    disabled={uploadForm.autoExtractDate}
                     value={uploadForm.imagingDatetime}
                     onChange={(e) => setUploadForm({ ...uploadForm, imagingDatetime: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                    placeholder={uploadForm.autoExtractDate ? "Date will be extracted from image" : ""}
                   />
                 </div>
                 
@@ -433,6 +588,42 @@ export default function PatientPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && studyToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-xl font-semibold mb-4">Delete Study</h2>
+            <p className="text-gray-600 mb-2">
+              Are you sure you want to delete this study?
+            </p>
+            <p className="text-gray-800 font-medium mb-6">
+              "{studyToDelete.title}"
+            </p>
+            <p className="text-sm text-red-600 mb-6">
+              This action cannot be undone. All associated images will be permanently deleted.
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setStudyToDelete(null)
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>

@@ -27,14 +27,15 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
     const client = await auth.getClient()
     const accessToken = await client.getAccessToken()
     
-    const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_4B_ENDPOINT_ID}:predict`
+    // Use dedicated endpoint domain for MedGemma 4B
+    const endpoint = `https://${MEDGEMMA_4B_ENDPOINT_ID}.${LOCATION}-744301221446.prediction.vertexai.goog/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_4B_ENDPOINT_ID}:predict`
     
     const requestBody = {
       instances: [{
         image: {
           bytesBase64Encoded: imageBase64
         },
-        text: "Describe this medical image in detail, including any notable findings, anatomical structures, and potential abnormalities."
+        prompt: "Describe this medical image in detail, including any notable findings, anatomical structures, and potential abnormalities."
       }]
     }
 
@@ -55,9 +56,13 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
 
     const data: MedGemmaResponse = await response.json()
     
+    console.log('MedGemma 4B Response:', JSON.stringify(data, null, 2))
+    
     // Extract the caption from the response
     if (data.predictions && data.predictions.length > 0) {
-      return data.predictions[0].text || 'No caption generated'
+      // Try different possible field names
+      const prediction = data.predictions[0]
+      return prediction.text || prediction.content || prediction.output || JSON.stringify(prediction) || 'No caption generated'
     }
     
     return 'No caption generated'
@@ -75,7 +80,8 @@ export async function generateSeriesSummary(sliceCaptions: string[]): Promise<st
     const client = await auth.getClient()
     const accessToken = await client.getAccessToken()
     
-    const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_27B_ENDPOINT_ID}:predict`
+    // Use dedicated endpoint domain for MedGemma 27B
+    const endpoint = `https://${MEDGEMMA_27B_ENDPOINT_ID}.${LOCATION}-744301221446.prediction.vertexai.goog/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_27B_ENDPOINT_ID}:predict`
     
     const prompt = `Given the following medical image slice descriptions from a single imaging study, produce a concise study-level summary that captures the key findings, anatomical observations, and any potential abnormalities:
 
