@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id               String   @id @default(uuid())
+  name             String
+  age              Int
+  sex              String   // 'M', 'F', 'Other'
+  mrn              String?
+  reasonForImaging String?  @map("reason_for_imaging")
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  studies          Study[]
+  reports          Report[]
+  
+  @@map("patients")
+}
+
+model Study {
+  id               String   @id @default(uuid())
+  patientId        String   @map("patient_id")
+  title            String
+  modality         String?
+  imagingDatetime  DateTime @map("imaging_datetime")
+  seriesSummary    String   @map("series_summary")
+  includeCodes     Boolean  @default(false) @map("include_codes")
+  geminiJson       Json?    @map("gemini_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+  
+  patient          Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  images           Image[]
+  
+  @@map("studies")
+}
+
+model Image {
+  id            String   @id @default(uuid())
+  studyId       String   @map("study_id")
+  gcsUrl        String   @map("gcs_url")
+  sliceIndex    Int      @map("slice_index")
+  sliceCaption  String   @map("slice_caption")
+  createdAt     DateTime @default(now()) @map("created_at")
+  
+  study         Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)
+  
+  @@map("images")
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  geminiJson  Json     @map("gemini_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  
+  @@map("reports")
+}
