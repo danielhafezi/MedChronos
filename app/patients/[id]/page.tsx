@@ -30,6 +30,7 @@ interface Study {
 interface Image {
   id: string
   gcsUrl: string
+  publicUrl: string
   sliceIndex: number
   sliceCaption: string
   enhancedCaption?: string | null
@@ -776,15 +777,15 @@ export default function PatientPage() {
                   </div>
                   <p>Unable to load medical image</p>
                   <p className="text-sm text-gray-400 mt-2">The image may require authentication or the URL may be invalid</p>
-                  <p className="text-xs text-gray-500 mt-4 break-all max-w-md mx-auto">URL: {selectedImage.gcsUrl}</p>
+                  <p className="text-xs text-gray-500 mt-4 break-all max-w-md mx-auto">URL: {selectedImage.publicUrl}</p>
                 </div>
               ) : (
                 <img
-                  src={selectedImage.gcsUrl}
+                  src={selectedImage.publicUrl}
                   alt={`Medical image slice ${selectedImage.sliceIndex + 1}`}
                   className="max-w-full max-h-full object-contain"
                   onError={(e) => {
-                    console.error('Failed to load image:', selectedImage.gcsUrl)
+                    console.error('Failed to load image:', selectedImage.publicUrl)
                     setImageLoadError(true)
                   }}
                   onLoad={() => setImageLoadError(false)}
