@@ -48,10 +48,15 @@ export default function PatientPage() {
   const [selectedStudy, setSelectedStudy] = useState<Study | null>(null)
   const [uploadProgress, setUploadProgress] = useState('')
   const [generatingReport, setGeneratingReport] = useState(false)
-  const [editingStudyId, setEditingStudyId] = useState<string | null>(null)
-  const [editingTitle, setEditingTitle] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [studyToDelete, setStudyToDelete] = useState<Study | null>(null)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingStudy, setEditingStudy] = useState<Study | null>(null)
+  const [editForm, setEditForm] = useState({
+    title: '',
+    modality: '',
+    imagingDatetime: ''
+  })
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -171,24 +176,53 @@ export default function PatientPage() {
   }
 
   const handleStartEdit = (study: Study) => {
-    setEditingStudyId(study.id)
-    setEditingTitle(study.title)
+    setEditingStudy(study)
+    setEditForm({
+      title: study.title,
+      modality: study.modality || '',
+      imagingDatetime: new Date(study.imagingDatetime).toISOString().slice(0, 16)
+    })
+    setShowEditModal(true)
   }
 
-  const handleSaveEdit = async (studyId: string) => {
-    try {
-      const response = await fetch(`/api/studies/${studyId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title: editingTitle })
-      })
+  const handleSaveEdit = async () => {
+    if (!editingStudy) return
 
-      if (response.ok) {
-        fetchPatient()
-        setEditingStudyId(null)
-        setEditingTitle('')
+    try {
+      const updateData: any = {}
+      
+      // Only include fields that have changed
+      if (editForm.title !== editingStudy.title) {
+        updateData.title = editForm.title
+      }
+      if (editForm.modality !== (editingStudy.modality || '')) {
+        updateData.modality = editForm.modality
+      }
+      const newDatetime = new Date(editForm.imagingDatetime).toISOString()
+      const oldDatetime = new Date(editingStudy.imagingDatetime).toISOString()
+      if (newDatetime !== oldDatetime) {
+        updateData.imagingDatetime = editForm.imagingDatetime
+      }
+
+      // Only make API call if there are changes
+      if (Object.keys(updateData).length > 0) {
+        const response = await fetch(`/api/studies/${editingStudy.id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(updateData)
+        })
+
+        if (response.ok) {
+          fetchPatient()
+          setShowEditModal(false)
+          setEditingStudy(null)
+        }
+      } else {
+        // No changes, just close modal
+        setShowEditModal(false)
+        setEditingStudy(null)
       }
     } catch (error) {
       console.error('Error updating study:', error)
@@ -196,8 +230,8 @@ export default function PatientPage() {
   }
 
   const handleCancelEdit = () => {
-    setEditingStudyId(null)
-    setEditingTitle('')
+    setShowEditModal(false)
+    setEditingStudy(null)
   }
 
   const handleDeleteStudy = async (study: Study) => {
@@ -335,37 +369,7 @@ export default function PatientPage() {
                     </span>
                   </div>
                   
-                  {editingStudyId === study.id ? (
-                    <div className="flex items-center gap-2 mb-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="text"
-                        value={editingTitle}
-                        onChange={(e) => setEditingTitle(e.target.value)}
-                        className="flex-1 px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleSaveEdit(study.id)
-                        }}
-                        className="p-1 hover:bg-green-100 rounded"
-                      >
-                        <Check className="w-4 h-4 text-green-600" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleCancelEdit()
-                        }}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        <X className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </div>
-                  ) : (
-                    <h3 className="font-semibold">{study.title}</h3>
-                  )}
+                  <h3 className="font-semibold">{study.title}</h3>
                   
                   {study.modality && (
                     <p className="text-sm text-gray-500">{study.modality}</p>
@@ -625,6 +629,75 @@ export default function PatientPage() {
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Study Modal */}
+      {showEditModal && editingStudy && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-xl font-semibold mb-4">Edit Study</h2>
+            
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveEdit(); }}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.title}
+                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., Chest CT with contrast"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Modality
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.modality}
+                    onChange={(e) => setEditForm({ ...editForm, modality: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., CT, MRI, X-Ray"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Imaging Date/Time *
+                  </label>
+                  <input
+                    type="datetime-local"
+                    required
+                    value={editForm.imagingDatetime}
+                    onChange={(e) => setEditForm({ ...editForm, imagingDatetime: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -23,7 +23,12 @@ interface ReportDisplayProps {
 
 export default function ReportDisplay({ report, patient }: ReportDisplayProps) {
   // Format the content with markdown
-  const formatContent = (content: string) => {
+  const formatContent = (content: string | null | undefined) => {
+    // Handle null, undefined, or non-string content
+    if (!content || typeof content !== 'string') {
+      return 'No content available.'
+    }
+    
     // Add bullet points if not already present
     const lines = content.split(/(?=[A-Z])/g).filter(line => line.trim())
     if (lines.length > 1 && !content.includes('•') && !content.includes('-')) {

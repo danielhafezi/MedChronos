@@ -31,25 +31,37 @@ export async function GET(
   }
 }
 
-// PATCH /api/studies/[id] - Update a study (primarily for title)
+// PATCH /api/studies/[id] - Update a study
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json()
-    const { title } = body
+    const { title, modality, imagingDatetime } = body
 
-    if (!title) {
+    // Validate at least one field is provided
+    if (!title && !modality && imagingDatetime === undefined) {
       return NextResponse.json(
-        { error: 'Title is required' },
+        { error: 'At least one field to update is required' },
         { status: 400 }
       )
     }
 
+    const updateData: any = {}
+    if (title !== undefined) updateData.title = title
+    if (modality !== undefined) updateData.modality = modality
+    if (imagingDatetime !== undefined) {
+      // Ensure the date is properly formatted
+      updateData.imagingDatetime = new Date(imagingDatetime)
+    }
+
     const study = await prisma.study.update({
       where: { id: params.id },
-      data: { title }
+      data: updateData,
+      include: {
+        images: true
+      }
     })
 
     return NextResponse.json(study)

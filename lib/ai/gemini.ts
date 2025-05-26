@@ -321,15 +321,15 @@ Return a JSON response exactly matching the requested_schema format. Be thorough
       const jsonStr = jsonMatch ? jsonMatch[1] || jsonMatch[0] : text
       const reportData = JSON.parse(jsonStr)
 
-      // Validate the response structure
+      // Validate the response structure and ensure all fields are strings
       if (!reportData.findings || !reportData.impression || !reportData.next_steps) {
         throw new Error('Invalid report structure')
       }
 
       return {
-        findings: reportData.findings,
-        impression: reportData.impression,
-        next_steps: reportData.next_steps,
+        findings: String(reportData.findings || 'No findings available.'),
+        impression: String(reportData.impression || 'No impression available.'),
+        next_steps: String(reportData.next_steps || 'No next steps available.'),
         ...(includeCodes && {
           icd10_codes: reportData.icd10_codes || [],
           snomed_codes: reportData.snomed_codes || []
