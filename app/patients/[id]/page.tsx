@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw } from 'lucide-react'
 import ReportDisplay from '@/app/components/ReportDisplay'
+import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -30,7 +31,7 @@ interface Study {
 interface Image {
   id: string
   gcsUrl: string
-  publicUrl: string
+  signedUrl: string // Changed from publicUrl to signedUrl
   sliceIndex: number
   sliceCaption: string
   enhancedCaption?: string | null
@@ -63,6 +64,8 @@ export default function PatientPage() {
   })
   const [selectedImage, setSelectedImage] = useState<Image | null>(null)
   const [imageLoadError, setImageLoadError] = useState(false)
+  const [rotation, setRotation] = useState(0)
+  const transformComponentRef = useRef<any>(null)
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -759,12 +762,48 @@ export default function PatientPage() {
                 <h3 className="text-lg font-semibold">Slice {selectedImage.sliceIndex + 1}</h3>
                 <p className="text-sm text-gray-600">Medical Image Viewer</p>
               </div>
-              <button
-                onClick={() => setSelectedImage(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  title="Zoom In"
+                  onClick={() => transformComponentRef.current?.zoomIn()}
+                  className="p-2 hover:bg-gray-200 rounded-lg"
+                >
+                  <ZoomIn className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  title="Zoom Out"
+                  onClick={() => transformComponentRef.current?.zoomOut()}
+                  className="p-2 hover:bg-gray-200 rounded-lg"
+                >
+                  <ZoomOut className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  title="Rotate 90°"
+                  onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                  className="p-2 hover:bg-gray-200 rounded-lg"
+                >
+                  <RotateCw className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  title="Reset View"
+                  onClick={() => {
+                    transformComponentRef.current?.resetTransform()
+                    setRotation(0)
+                  }}
+                  className="p-2 hover:bg-gray-200 rounded-lg"
+                >
+                  <RefreshCw className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedImage(null)
+                    setRotation(0) // Reset rotation when closing
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             
             <div className="bg-black flex-1 flex items-center justify-center overflow-hidden">
@@ -777,23 +816,36 @@ export default function PatientPage() {
                   </div>
                   <p>Unable to load medical image</p>
                   <p className="text-sm text-gray-400 mt-2">The image may require authentication or the URL may be invalid</p>
-                  <p className="text-xs text-gray-500 mt-4 break-all max-w-md mx-auto">URL: {selectedImage.publicUrl}</p>
+                  <p className="text-xs text-gray-500 mt-4 break-all max-w-md mx-auto">URL: {selectedImage.signedUrl}</p>
                 </div>
               ) : (
-                <img
-                  src={selectedImage.publicUrl}
-                  alt={`Medical image slice ${selectedImage.sliceIndex + 1}`}
-                  className="max-w-full max-h-full object-contain"
-                  onError={(e) => {
-                    console.error('Failed to load image:', selectedImage.publicUrl)
-                    setImageLoadError(true)
-                  }}
-                  onLoad={() => setImageLoadError(false)}
-                />
+                <TransformWrapper
+                  ref={transformComponentRef}
+                  initialScale={1}
+                  initialPositionX={0}
+                  initialPositionY={0}
+                >
+                  <TransformComponent
+                    wrapperStyle={{ width: '100%', height: '100%' }}
+                    contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <img
+                      src={selectedImage.signedUrl}
+                      alt={`Medical image slice ${selectedImage.sliceIndex + 1}`}
+                      className="max-w-full max-h-full object-contain"
+                      style={{ transform: `rotate(${rotation}deg)` }}
+                      onError={(e) => {
+                        console.error('Failed to load image:', selectedImage.signedUrl)
+                        setImageLoadError(true)
+                      }}
+                      onLoad={() => setImageLoadError(false)}
+                    />
+                  </TransformComponent>
+                </TransformWrapper>
               )}
             </div>
             
-            <div className="bg-white rounded-b-lg p-4">
+            <div className="bg-white rounded-b-lg p-4 max-h-[25vh] overflow-y-auto">
               <h4 className="font-medium mb-2">Enhanced Caption</h4>
               <p className="text-sm text-gray-700 mb-4">
                 {selectedImage.enhancedCaption || selectedImage.sliceCaption}

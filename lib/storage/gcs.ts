@@ -13,7 +13,6 @@ const bucket = storage.bucket(bucketName)
 export interface UploadResult {
   gcsUrl: string
   fileName: string
-  publicUrl: string
 }
 
 /**
@@ -35,14 +34,12 @@ export async function uploadToGCS(
       resumable: false,
     })
 
-    // Generate GCS URL and signed URL for secure access
+    // Generate GCS URL
     const gcsUrl = `gs://${bucketName}/${fileName}`
-    const publicUrl = await getSignedUrl(fileName)
 
     return {
       gcsUrl,
       fileName,
-      publicUrl,
     }
   } catch (error) {
     console.error('Error uploading to GCS:', error)

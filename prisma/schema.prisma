@@ -46,7 +46,6 @@ model Image {
   id               String   @id @default(uuid())
   studyId          String   @map("study_id")
   gcsUrl           String   @map("gcs_url")
-  publicUrl        String   @map("public_url")
   sliceIndex       Int      @map("slice_index")
   sliceCaption     String   @map("slice_caption")
   enhancedCaption  String?  @map("enhanced_caption")

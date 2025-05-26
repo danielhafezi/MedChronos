@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
-import { deleteFolder } from '@/lib/storage/gcs'
+import { deleteFolder, getSignedUrl } from '@/lib/storage/gcs'
 
 // GET /api/patients/[id] - Get a specific patient with studies
 export async function GET(
@@ -30,7 +30,23 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(patient)
+    // Generate signed URLs for each image
+    const patientWithSignedUrls = {
+      ...patient,
+      studies: await Promise.all(
+        patient.studies.map(async (study: any) => ({
+          ...study,
+          images: await Promise.all(
+            study.images.map(async (image: any) => ({
+              ...image,
+              signedUrl: await getSignedUrl(image.gcsUrl),
+            }))
+          ),
+        }))
+      ),
+    }
+
+    return NextResponse.json(patientWithSignedUrls)
   } catch (error) {
     console.error('Error fetching patient:', error)
     return NextResponse.json(

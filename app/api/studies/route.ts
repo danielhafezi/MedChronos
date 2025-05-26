@@ -195,7 +195,6 @@ export async function POST(request: NextRequest) {
           data: {
             studyId: study.id,
             gcsUrl: uploadResult.gcsUrl,
-            publicUrl: uploadResult.publicUrl,
             sliceIndex: index,
             sliceCaption: rawCaption,
             enhancedCaption: enhancedCaption
