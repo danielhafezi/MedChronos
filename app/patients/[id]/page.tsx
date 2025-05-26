@@ -116,7 +116,7 @@ export default function PatientPage() {
         formData.append(`file${index}`, file)
       })
 
-      setUploadProgress('Processing images with AI...')
+      setUploadProgress('processing')
       
       const response = await fetch('/api/studies', {
         method: 'POST',
@@ -356,9 +356,126 @@ export default function PatientPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-500">Loading...</div>
-      </div>
+      <main className="min-h-screen bg-gray-50">
+        {/* Header Skeleton */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 py-4">
+            <div className="flex items-center gap-4">
+              <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+              <div>
+                <div className="h-6 bg-gray-200 rounded w-48 animate-pulse mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Actions Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex gap-3">
+            <div className="h-10 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
+            <div className="h-10 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
+          </div>
+        </div>
+
+        {/* Timeline Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="h-6 bg-gray-200 rounded w-40 animate-pulse mb-4"></div>
+          
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-lg p-4 min-w-[300px] animate-pulse"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+                </div>
+                
+                <div className="h-5 bg-gray-200 rounded w-full mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-20 mb-3"></div>
+                
+                <div className="space-y-2">
+                  <div className="h-3 bg-gray-200 rounded w-full"></div>
+                  <div className="h-3 bg-gray-200 rounded w-5/6"></div>
+                  <div className="h-3 bg-gray-200 rounded w-4/6"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Report Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="h-6 bg-gray-200 rounded w-32 animate-pulse mb-4"></div>
+          
+          <div className="bg-white rounded-lg shadow-sm">
+            {/* Patient Header Skeleton */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-t-lg border-b">
+              <div className="h-6 bg-gray-200 rounded w-64 animate-pulse mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+            </div>
+            
+            {/* Report Sections Skeleton */}
+            <div className="p-6 space-y-6">
+              {/* Findings Section */}
+              <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-5 bg-gray-200 rounded w-20 animate-pulse"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-4/6 animate-pulse"></div>
+                </div>
+              </div>
+              
+              {/* Impression Section */}
+              <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-5 bg-gray-200 rounded w-24 animate-pulse"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                </div>
+              </div>
+              
+              {/* Next Steps Section */}
+              <div className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded-r-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
+                  <div className="h-5 bg-gray-200 rounded w-28 animate-pulse"></div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
+                  <div className="h-4 bg-gray-200 rounded w-4/6 animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Disclaimer Skeleton */}
+            <div className="px-6 pb-6">
+              <div className="bg-gray-50 p-4 rounded-lg border">
+                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse mb-1"></div>
+                <div className="h-3 bg-gray-200 rounded w-full animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Indicator */}
+        <div className="fixed bottom-6 right-6">
+          <div className="bg-white rounded-lg shadow-lg p-4 flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm font-medium text-gray-700">Loading patient data...</span>
+          </div>
+        </div>
+      </main>
     )
   }
 
@@ -666,8 +783,25 @@ export default function PatientPage() {
               </div>
               
               {uploadProgress && (
-                <div className="mt-4 text-sm text-blue-600">
-                  {uploadProgress}
+                <div className="mt-4">
+                  {uploadProgress === 'processing' ? (
+                    <div className="flex items-center justify-center p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="relative">
+                          <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                          <div className="absolute inset-0 w-10 h-10 border-4 border-transparent border-r-blue-400 rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1.5s' }}></div>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium text-blue-800">Processing with AI</p>
+                          <p className="text-xs text-blue-600 mt-1">Analyzing medical images...</p>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-blue-600">
+                      {uploadProgress}
+                    </div>
+                  )}
                 </div>
               )}
               
