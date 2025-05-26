@@ -224,15 +224,24 @@ export async function extractImagingDate(
 3. DICOM overlay text
 4. Printed report sections
 
-Extract the date and convert it to ISO format (YYYY-MM-DD). If a time is also visible, include it (YYYY-MM-DDTHH:mm).`
+IMPORTANT: Pay special attention to Iranian/Shamsi dates (Solar Hijri calendar) which may appear in formats like:
+- 1402/03/15 (Shamsi year/month/day)
+- 15/03/1402 (day/month/Shamsi year)  
+- Persian numerals (۱۴۰۲/۰۳/۱۵)
+- Farsi month names (فروردین، اردیبهشت، خرداد، etc.)
+
+If you identify a Shamsi/Iranian date, convert it to Gregorian calendar before returning the ISO format.
+
+Extract the date and convert it to ISO format (YYYY-MM-DD). If a time is also visible, include it (YYYY-MM-DDTHH:mm). Always ensure the final output uses Gregorian calendar dates.`
 
     const prompt = `${systemPrompt}
 
-Analyze this medical image and extract the imaging/acquisition date. Return a JSON response with:
+Analyze this medical image and extract the imaging/acquisition date. If you find a Shamsi/Iranian date, convert it to Gregorian calendar first. Return a JSON response with:
 {
-  "date": "YYYY-MM-DD or YYYY-MM-DDTHH:mm format, or null if not found",
+  "date": "YYYY-MM-DD or YYYY-MM-DDTHH:mm format (Gregorian calendar), or null if not found",
   "confidence": "high/medium/low/none",
-  "originalFormat": "the date as it appears in the image (if found)"
+  "originalFormat": "the date as it appears in the image (if found)",
+  "shamsiDetected": "true if Shamsi date was detected and converted, false otherwise"
 }`
 
     // Use the vision model with the image

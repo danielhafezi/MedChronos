@@ -66,6 +66,8 @@ export default function PatientPage() {
   const [imageLoadError, setImageLoadError] = useState(false)
   const [rotation, setRotation] = useState(0)
   const transformComponentRef = useRef<any>(null)
+  const [refreshingStudyId, setRefreshingStudyId] = useState<string | null>(null)
+  const [refreshProgress, setRefreshProgress] = useState('')
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -176,13 +178,48 @@ export default function PatientPage() {
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setUploadForm({
-        ...uploadForm,
-        files: Array.from(e.target.files)
-      })
+    if (e.target.files && e.target.files.length > 0) {
+      setUploadForm(prevForm => ({
+        ...prevForm,
+        files: [...prevForm.files, ...Array.from(e.target.files as FileList)]
+      }));
     }
-  }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setUploadForm(prevForm => ({
+        ...prevForm,
+        files: [...prevForm.files, ...Array.from(e.dataTransfer.files as FileList)]
+      }));
+      e.dataTransfer.clearData();
+    }
+    // Add visual feedback for drop area styling if needed
+    const dropZone = e.currentTarget;
+    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+    dropZone.classList.add('border-gray-300');
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Add visual feedback for drop area styling if needed
+    const dropZone = e.currentTarget;
+    dropZone.classList.remove('border-gray-300');
+    dropZone.classList.add('border-blue-500', 'bg-blue-50');
+
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Add visual feedback for drop area styling if needed
+    const dropZone = e.currentTarget;
+    dropZone.classList.remove('border-blue-500', 'bg-blue-50');
+    dropZone.classList.add('border-gray-300');
+  };
 
   const handleStartEdit = (study: Study) => {
     setEditingStudy(study)
@@ -266,6 +303,57 @@ export default function PatientPage() {
     }
   }
 
+  const handleRefreshStudy = async (study: Study) => {
+    setRefreshingStudyId(study.id)
+    setRefreshProgress('Regenerating image captions...')
+
+    try {
+      const response = await fetch(`/api/studies/${study.id}/refresh`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setRefreshProgress('AI analysis complete!')
+        
+        // Refresh the patient data to show updated captions and summary
+        await fetchPatient()
+        
+        // Update the selected study in the modal if it's currently open
+        if (selectedStudy && selectedStudy.id === study.id) {
+          const updatedPatient = await fetch(`/api/patients/${params.id}`).then(res => res.json())
+          const updatedStudy = updatedPatient.studies.find((s: Study) => s.id === study.id)
+          if (updatedStudy) {
+            setSelectedStudy(updatedStudy)
+          }
+        }
+        
+        // Clear progress after a short delay
+        setTimeout(() => {
+          setRefreshProgress('')
+        }, 2000)
+      } else {
+        const errorData = await response.json()
+        setRefreshProgress(errorData.error || 'Failed to refresh study. Please try again.')
+        
+        // Clear error after delay
+        setTimeout(() => {
+          setRefreshProgress('')
+        }, 5000)
+      }
+    } catch (error) {
+      console.error('Error refreshing study:', error)
+      setRefreshProgress('Failed to refresh study. Please try again.')
+      
+      // Clear error after delay
+      setTimeout(() => {
+        setRefreshProgress('')
+      }, 5000)
+    } finally {
+      setRefreshingStudyId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -332,6 +420,16 @@ export default function PatientPage() {
       <div className="max-w-7xl mx-auto px-4 py-4">
         <h2 className="text-lg font-semibold mb-4">Imaging Timeline</h2>
         
+        {/* Refresh Progress Indicator */}
+        {refreshProgress && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
+              <span className="text-sm text-blue-700 font-medium">{refreshProgress}</span>
+            </div>
+          </div>
+        )}
+        
         {patient.studies.length === 0 ? (
           <div className="bg-white rounded-lg p-8 text-center text-gray-500">
             No imaging studies yet. Upload your first study to get started.
@@ -351,7 +449,7 @@ export default function PatientPage() {
                       handleStartEdit(study)
                     }}
                     className="p-1.5 hover:bg-gray-100 rounded-lg"
-                    title="Edit title"
+                    title="Edit study"
                   >
                     <Edit2 className="w-4 h-4 text-gray-600" />
                   </button>
@@ -502,18 +600,54 @@ export default function PatientPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Images *
                   </label>
-                  <input
-                    type="file"
-                    multiple
-                    required
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md cursor-pointer hover:border-blue-400 transition-colors duration-150 ease-in-out"
+                    onClick={() => document.getElementById('file-upload-input')?.click()}
+                  >
+                    <div className="space-y-1 text-center">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                      <div className="flex text-sm text-gray-600">
+                        <span className="relative bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-blue-500">
+                          Upload files
+                        </span>
+                        <input id="file-upload-input" name="file-upload" type="file" className="sr-only" multiple onChange={handleFileChange} accept="image/*" />
+                        <p className="pl-1">or drag and drop</p>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        PNG, JPG, GIF up to 10MB each
+                      </p>
+                    </div>
+                  </div>
                   {uploadForm.files.length > 0 && (
-                    <p className="text-sm text-gray-600 mt-1">
-                      {uploadForm.files.length} file(s) selected
-                    </p>
+                    <div className="mt-3">
+                      <p className="text-sm font-medium text-gray-700 mb-1">Selected files:</p>
+                      <ul className="list-disc list-inside text-sm text-gray-600 max-h-32 overflow-y-auto">
+                        {uploadForm.files.map((file, index) => (
+                          <li key={index} className="truncate">
+                            {file.name} ({ (file.size / 1024).toFixed(2) } KB)
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadForm(prev => ({
+                                  ...prev,
+                                  files: prev.files.filter((_, i) => i !== index)
+                                }))
+                              }}
+                              className="ml-2 text-red-500 hover:text-red-700"
+                              title="Remove file"
+                            >
+                              <Trash2 className="inline w-3 h-3" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Total: {uploadForm.files.length} file(s) selected
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -587,12 +721,23 @@ export default function PatientPage() {
                   {new Date(selectedStudy.imagingDatetime).toLocaleString()}
                 </p>
               </div>
-              <button
-                onClick={() => setSelectedStudy(null)}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleRefreshStudy(selectedStudy)}
+                  disabled={refreshingStudyId === selectedStudy.id}
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Refresh AI captions and summary"
+                >
+                  <RefreshCw className={`w-4 h-4 ${refreshingStudyId === selectedStudy.id ? 'animate-spin' : ''}`} />
+                  {refreshingStudyId === selectedStudy.id ? 'Refreshing...' : 'Refresh AI'}
+                </button>
+                <button
+                  onClick={() => setSelectedStudy(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             
             <div className="mb-6">
