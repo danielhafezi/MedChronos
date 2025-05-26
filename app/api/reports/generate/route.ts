@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
       reasonForImaging: patient.reasonForImaging || undefined
     }
 
-    const studiesData = patient.studies.map((study) => ({
+    const studiesData = patient.studies.map((study: any) => ({
+      id: study.id,
       title: study.title,
       imagingDatetime: study.imagingDatetime,
       seriesSummary: study.seriesSummary

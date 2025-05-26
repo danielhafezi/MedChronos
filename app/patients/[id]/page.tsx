@@ -372,6 +372,13 @@ export default function PatientPage() {
 
   const latestReport = patient.reports[0]
 
+  const handleReportCitationClick = (studyId: string) => {
+    const study = patient?.studies.find(s => s.id === studyId)
+    if (study) {
+      setSelectedStudy(study)
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -439,6 +446,7 @@ export default function PatientPage() {
             {patient.studies.map((study) => (
               <div
                 key={study.id}
+                id={`study-${study.id}`}
                 className="bg-white rounded-lg p-4 min-w-[300px] hover:shadow-md transition relative group"
               >
                 {/* Edit/Delete buttons */}
@@ -507,7 +515,12 @@ export default function PatientPage() {
       {latestReport && (
         <div className="max-w-7xl mx-auto px-4 py-4">
           <h2 className="text-lg font-semibold mb-4">Latest Report</h2>
-          <ReportDisplay report={latestReport} patient={patient} />
+          <ReportDisplay 
+            report={latestReport} 
+            patient={patient} 
+            studies={patient.studies} 
+            onCitationClick={handleReportCitationClick} 
+          />
         </div>
       )}
 

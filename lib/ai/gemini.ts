@@ -13,6 +13,7 @@ export interface PatientData {
 }
 
 export interface StudyData {
+  id: string
   title: string
   imagingDatetime: Date
   seriesSummary: string
@@ -24,6 +25,7 @@ export interface ReportOutput {
   next_steps: string
   icd10_codes?: string[]
   snomed_codes?: string[]
+  citations?: { [key: string]: string } // Map of citation IDs to study IDs
 }
 
 /**
@@ -347,7 +349,7 @@ Analyze this medical image and identify the imaging modality. Return ONLY the mo
 }
 
 /**
- * Generate a holistic report using Gemini
+ * Generate a holistic report using Gemini with citations
  */
 export async function generateHolisticReport(
   patient: PatientData,
@@ -360,8 +362,25 @@ export async function generateHolisticReport(
       (a, b) => a.imagingDatetime.getTime() - b.imagingDatetime.getTime()
     )
 
+    // Create a mapping of study numbers for easier referencing
+    const studyNumberMap = new Map<string, number>()
+    sortedStudies.forEach((study, index) => {
+      studyNumberMap.set(study.id, index + 1)
+    })
+
     // Build the prompt
-    const systemPrompt = `You are an expert radiologist with extensive experience in interpreting medical imaging studies. You provide comprehensive, accurate, and clinically relevant reports that help guide patient care.`
+    const systemPrompt = `You are an expert radiologist with extensive experience in interpreting medical imaging studies. You provide comprehensive, accurate, and clinically relevant reports that help guide patient care.
+
+IMPORTANT: When writing your report, you MUST cite the specific imaging study that supports each finding or statement. Use the format [CITE:study_id] where study_id is the ID of the study being referenced. You can cite multiple studies for a single statement using [CITE:study_id1,study_id2].
+
+Example: "Mild ground-glass opacities are noted in the bilateral lower lobes [CITE:study_1]. These findings have progressed compared to the prior study [CITE:study_1,study_2]."
+
+CITATION RULES:
+1. EVERY medical finding, observation, or comparison MUST have a citation
+2. Use the exact study IDs provided in the study data
+3. When comparing studies, cite all relevant studies
+4. General statements about the patient don't need citations
+5. Recommendations should cite the studies that support them`
 
     const userPrompt = {
       patient_demo: {
@@ -370,15 +389,18 @@ export async function generateHolisticReport(
         sex: patient.sex,
         reason: patient.reasonForImaging || 'Not specified'
       },
-      studies: sortedStudies.map(study => ({
+      studies: sortedStudies.map((study, index) => ({
+        study_id: study.id,
+        study_number: index + 1,
         title: study.title,
         date: study.imagingDatetime.toISOString(),
         summary: study.seriesSummary
       })),
       requested_schema: {
-        findings: 'Detailed description of all relevant findings across all studies, noting any changes over time',
-        impression: 'Concise summary of the most important findings and their clinical significance',
-        next_steps: 'Recommended follow-up actions, additional imaging, or clinical interventions',
+        findings: 'Detailed description of all relevant findings across all studies with proper citations [CITE:study_id]',
+        impression: 'Concise summary of the most important findings and their clinical significance with citations',
+        next_steps: 'Recommended follow-up actions, additional imaging, or clinical interventions with supporting citations',
+        citations: 'An object mapping citation IDs to study IDs (automatically extracted from your text)',
         ...(includeCodes && {
           icd10_codes: 'Array of relevant ICD-10 diagnosis codes',
           snomed_codes: 'Array of relevant SNOMED CT codes'
@@ -388,12 +410,12 @@ export async function generateHolisticReport(
 
     const prompt = `${systemPrompt}
 
-Based on the following patient information and imaging studies, generate a comprehensive radiology report.
+Based on the following patient information and imaging studies, generate a comprehensive radiology report with proper citations.
 
 Patient Information and Studies:
 ${JSON.stringify(userPrompt, null, 2)}
 
-Return a JSON response exactly matching the requested_schema format. Be thorough but concise, and ensure all findings are clinically relevant.`
+Return a JSON response exactly matching the requested_schema format. Remember to include [CITE:study_id] citations in your findings, impression, and next_steps text. The citations object should map extracted citation references to actual study IDs.`
 
     // Generate the report
     const result = await proModel.generateContent(prompt)
@@ -412,10 +434,30 @@ Return a JSON response exactly matching the requested_schema format. Be thorough
         throw new Error('Invalid report structure')
       }
 
+      // Extract citations from the text and create a mapping
+      const citations: { [key: string]: string } = {}
+      const citationPattern = /\[CITE:([^\]]+)\]/g
+      
+      // Extract from all text fields
+      const allText = `${reportData.findings} ${reportData.impression} ${reportData.next_steps}`
+      let match
+      let citationCounter = 1
+      
+      while ((match = citationPattern.exec(allText)) !== null) {
+        const studyIds = match[1].split(',').map(id => id.trim())
+        studyIds.forEach(studyId => {
+          if (!citations[studyId]) {
+            citations[`cite_${citationCounter}`] = studyId
+            citationCounter++
+          }
+        })
+      }
+
       return {
         findings: String(reportData.findings || 'No findings available.'),
         impression: String(reportData.impression || 'No impression available.'),
         next_steps: String(reportData.next_steps || 'No next steps available.'),
+        citations: citations,
         ...(includeCodes && {
           icd10_codes: reportData.icd10_codes || [],
           snomed_codes: reportData.snomed_codes || []
