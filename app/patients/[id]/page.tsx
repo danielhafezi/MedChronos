@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon } from 'lucide-react'
 import ReportDisplay from '@/app/components/ReportDisplay'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Patient {
   id: string
@@ -30,6 +32,7 @@ interface Image {
   gcsUrl: string
   sliceIndex: number
   sliceCaption: string
+  enhancedCaption?: string | null
 }
 
 interface Report {
@@ -57,6 +60,8 @@ export default function PatientPage() {
     modality: '',
     imagingDatetime: ''
   })
+  const [selectedImage, setSelectedImage] = useState<Image | null>(null)
+  const [imageLoadError, setImageLoadError] = useState(false)
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -375,8 +380,19 @@ export default function PatientPage() {
                     <p className="text-sm text-gray-500">{study.modality}</p>
                   )}
                   <p className="text-sm text-gray-600 mt-2">{study.images.length} images</p>
-                  <div className="mt-3 text-sm text-gray-700">
-                    <p className="line-clamp-3">{study.seriesSummary}</p>
+                  <div className="mt-3 text-sm text-gray-700 line-clamp-3">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        p: ({ children }) => <p className="mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc list-inside">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside">{children}</ol>,
+                        li: ({ children }) => <li className="mb-0">{children}</li>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      }}
+                    >
+                      {study.seriesSummary}
+                    </ReactMarkdown>
                   </div>
                 </div>
               </div>
@@ -577,18 +593,49 @@ export default function PatientPage() {
             
             <div className="mb-6">
               <h3 className="font-semibold mb-2">Study Summary</h3>
-              <p className="text-gray-700">{selectedStudy.seriesSummary}</p>
+              <div className="text-gray-700">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => <p className="mb-2">{children}</p>,
+                    ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
+                    ol: ({ children }) => <ol className="list-decimal list-inside mb-2">{children}</ol>,
+                    li: ({ children }) => <li className="mb-1">{children}</li>,
+                    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                  }}
+                >
+                  {selectedStudy.seriesSummary}
+                </ReactMarkdown>
+              </div>
             </div>
             
             <div>
-              <h3 className="font-semibold mb-2">Image Captions</h3>
-              <div className="space-y-2">
+              <h3 className="font-semibold mb-2">Images & Captions</h3>
+              <div className="space-y-3">
                 {selectedStudy.images.map((image) => (
-                  <div key={image.id} className="border rounded-lg p-3">
-                    <p className="text-sm font-medium text-gray-900">
-                      Slice {image.sliceIndex + 1}
-                    </p>
-                    <p className="text-sm text-gray-700 mt-1">{image.sliceCaption}</p>
+                  <div 
+                    key={image.id} 
+                    className="border rounded-lg p-4 hover:shadow-md transition cursor-pointer"
+                    onClick={() => {
+                      setImageLoadError(false)
+                      setSelectedImage(image)
+                    }}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900 mb-2">
+                          Slice {image.sliceIndex + 1}
+                        </p>
+                        <p className="text-sm text-gray-700">
+                          {image.enhancedCaption || image.sliceCaption}
+                        </p>
+                      </div>
+                      <div className="ml-4 flex-shrink-0">
+                        <div className="bg-gray-100 p-2 rounded-lg hover:bg-gray-200 transition">
+                          <ImageIcon className="w-5 h-5 text-gray-600" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -698,6 +745,68 @@ export default function PatientPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50">
+          <div className="relative max-w-6xl w-full max-h-[90vh] flex flex-col">
+            <div className="bg-white rounded-t-lg p-4 flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-semibold">Slice {selectedImage.sliceIndex + 1}</h3>
+                <p className="text-sm text-gray-600">Medical Image Viewer</p>
+              </div>
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="bg-black flex-1 flex items-center justify-center overflow-hidden">
+              {imageLoadError ? (
+                <div className="text-white text-center">
+                  <div className="mb-4">
+                    <svg className="w-16 h-16 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                  </div>
+                  <p>Unable to load medical image</p>
+                  <p className="text-sm text-gray-400 mt-2">The image may require authentication or the URL may be invalid</p>
+                  <p className="text-xs text-gray-500 mt-4 break-all max-w-md mx-auto">URL: {selectedImage.gcsUrl}</p>
+                </div>
+              ) : (
+                <img
+                  src={selectedImage.gcsUrl}
+                  alt={`Medical image slice ${selectedImage.sliceIndex + 1}`}
+                  className="max-w-full max-h-full object-contain"
+                  onError={(e) => {
+                    console.error('Failed to load image:', selectedImage.gcsUrl)
+                    setImageLoadError(true)
+                  }}
+                  onLoad={() => setImageLoadError(false)}
+                />
+              )}
+            </div>
+            
+            <div className="bg-white rounded-b-lg p-4">
+              <h4 className="font-medium mb-2">Enhanced Caption</h4>
+              <p className="text-sm text-gray-700 mb-4">
+                {selectedImage.enhancedCaption || selectedImage.sliceCaption}
+              </p>
+              
+              <details className="text-sm">
+                <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
+                  View Original Caption
+                </summary>
+                <p className="mt-2 text-gray-600">
+                  {selectedImage.sliceCaption}
+                </p>
+              </details>
+            </div>
           </div>
         </div>
       )}

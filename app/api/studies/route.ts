@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db/client'
 import { uploadToGCS } from '@/lib/storage/gcs'
 import { processImage, isValidImageFormat } from '@/lib/utils/image-processing'
 import { generateImageCaption as generateImageCaptionMedGemma, generateSeriesSummary as generateSeriesSummaryMedGemma, withRetry } from '@/lib/ai/medgemma'
-import { generateStudyTitle, extractImagingDate, extractImagingModality, generateImageCaption as generateImageCaptionGemini, generateSeriesSummary as generateSeriesSummaryGemini } from '@/lib/ai/gemini'
+import { generateStudyTitle, extractImagingDate, extractImagingModality, generateImageCaption as generateImageCaptionGemini, generateSeriesSummary as generateSeriesSummaryGemini, enhanceMedGemmaCaption, generateEnhancedStudySummary } from '@/lib/ai/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for processing
@@ -169,46 +169,67 @@ export async function POST(request: NextRequest) {
         )
 
         // Generate caption - try MedGemma first, fallback to Gemini
-        let caption: string
+        let rawCaption: string
         try {
-          caption = await withRetry(() => 
+          rawCaption = await withRetry(() => 
             generateImageCaptionMedGemma(processed.base64)
           )
         } catch (error) {
           console.log('MedGemma failed, falling back to Gemini for image caption')
-          caption = await withRetry(() => 
+          rawCaption = await withRetry(() => 
             generateImageCaptionGemini(processed.base64)
           )
         }
 
-        // Save image record
+        // Enhance the caption using Gemini Flash for better readability
+        let enhancedCaption: string
+        try {
+          enhancedCaption = await enhanceMedGemmaCaption(rawCaption, index, files.length)
+        } catch (error) {
+          console.error('Error enhancing caption:', error)
+          enhancedCaption = rawCaption // Fallback to raw caption
+        }
+
+        // Save image record with both raw and enhanced captions
         const image = await prisma.image.create({
           data: {
             studyId: study.id,
             gcsUrl: uploadResult.gcsUrl,
             sliceIndex: index,
-            sliceCaption: caption
+            sliceCaption: rawCaption,
+            enhancedCaption: enhancedCaption
           }
         })
 
-        return { image, caption }
+        return { image, rawCaption, enhancedCaption }
       })
 
       // Wait for all images to be processed
       const results = await Promise.all(imagePromises)
-      const sliceCaptions = results.map(r => r.caption)
+      const enhancedCaptions = results.map(r => r.enhancedCaption)
 
-      // Generate series summary - try MedGemma first, fallback to Gemini
+      // Generate enhanced study summary using Gemini Flash with enhanced captions
       let seriesSummary: string
       try {
-        seriesSummary = await withRetry(() => 
-          generateSeriesSummaryMedGemma(sliceCaptions)
+        seriesSummary = await generateEnhancedStudySummary(
+          enhancedCaptions,
+          finalTitle,
+          finalModality || undefined
         )
       } catch (error) {
-        console.log('MedGemma 27B failed, falling back to Gemini for series summary')
-        seriesSummary = await withRetry(() => 
-          generateSeriesSummaryGemini(sliceCaptions)
-        )
+        console.error('Error generating enhanced summary, falling back to standard summary:', error)
+        // Fallback to standard summary generation if enhanced fails
+        const rawCaptions = results.map(r => r.rawCaption)
+        try {
+          seriesSummary = await withRetry(() => 
+            generateSeriesSummaryMedGemma(rawCaptions)
+          )
+        } catch (fallbackError) {
+          console.log('MedGemma 27B failed, falling back to Gemini for series summary')
+          seriesSummary = await withRetry(() => 
+            generateSeriesSummaryGemini(rawCaptions)
+          )
+        }
       }
 
       // Update study with summary
