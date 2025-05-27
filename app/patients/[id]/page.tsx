@@ -411,123 +411,139 @@ export default function PatientPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50">
+      <main className="min-h-screen bg-gray-50 animate-pulse">
         {/* Header Skeleton */}
         <div className="bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+              <div className="w-8 h-8 bg-gray-300 rounded-lg"></div> {/* Back button */}
               <div>
-                <div className="h-6 bg-gray-200 rounded w-48 animate-pulse mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-64 animate-pulse"></div>
+                <div className="h-6 bg-gray-300 rounded w-48 mb-1"></div> {/* Patient Name */}
+                <div className="h-4 bg-gray-300 rounded w-32"></div> {/* Age/Sex/MRN */}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Actions Skeleton */}
-        <div className="max-w-7xl mx-auto px-4 py-4">
+        {/* Breadcrumb Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 pt-4">
+          <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
+        </div>
+        
+        {/* Sticky Actions Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 py-4 sticky top-0 bg-gray-50 z-40 shadow-sm">
           <div className="flex gap-3">
-            <div className="h-10 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
-            <div className="h-10 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
+            <div className="h-10 bg-gray-300 rounded-lg w-40"></div> {/* Upload Imaging Button */}
           </div>
         </div>
 
-        {/* Timeline Skeleton */}
+        {/* Imaging Timeline Skeleton */}
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="h-6 bg-gray-200 rounded w-40 animate-pulse mb-4"></div>
+          <div className="flex justify-between items-center mb-4">
+            <div className="h-6 bg-gray-300 rounded w-1/3"></div> {/* "Imaging Timeline" Title */}
+            <div className="h-8 bg-gray-300 rounded-lg w-36"></div> {/* Generate Report Button */}
+          </div>
           
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-lg p-4 min-w-[300px] animate-pulse"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                  <div className="h-4 bg-gray-200 rounded w-24"></div>
+          <div className="relative">
+            <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-300 z-0"></div> {/* Timeline Line */}
+            <div className="flex gap-6 overflow-x-auto pb-4 relative z-10">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-gray-200 rounded-lg p-3 min-w-[240px] max-w-[280px] border-2 border-gray-300 shadow-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-gray-300 rounded-md"></div> {/* Icon */}
+                      <div className="h-3 bg-gray-300 rounded w-20"></div> {/* Date */}
+                    </div>
+                    <div className="w-8 h-5 bg-gray-300 rounded-full"></div> {/* Image Count */}
+                  </div>
+                  <div className="mb-2">
+                    <div className="h-4 bg-gray-300 rounded w-3/4 mb-1"></div> {/* Title line 1 */}
+                    <div className="h-4 bg-gray-300 rounded w-1/2"></div>      {/* Title line 2 */}
+                    <div className="h-3 bg-gray-300 rounded w-16 mt-1"></div> {/* Modality */}
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-3 bg-gray-300 rounded w-full"></div>   {/* Summary line 1 */}
+                    <div className="h-3 bg-gray-300 rounded w-5/6"></div>   {/* Summary line 2 */}
+                  </div>
                 </div>
-                
-                <div className="h-5 bg-gray-200 rounded w-full mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-16 mb-2"></div>
-                <div className="h-4 bg-gray-200 rounded w-20 mb-3"></div>
-                
-                <div className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded w-full"></div>
-                  <div className="h-3 bg-gray-200 rounded w-5/6"></div>
-                  <div className="h-3 bg-gray-200 rounded w-4/6"></div>
-                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Latest Report Skeleton */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex justify-between items-center mb-4">
+            <div className="h-6 bg-gray-300 rounded w-1/4"></div> {/* "Latest Report" Title */}
+            <div className="h-8 bg-gray-300 rounded-lg w-40"></div> {/* Chat with Report Button */}
+          </div>
+          
+          {/* ReportDisplay Skeleton - mimicking glassmorphism with grays */}
+          <div className="bg-gray-200/50 backdrop-blur-md rounded-lg shadow-lg border border-gray-300/20 p-0.5"> {/* Outer container with slight transparency */}
+            {/* Report Header Skeleton */}
+            <div className="bg-gray-300/30 backdrop-blur-sm p-4 rounded-t-lg flex items-center gap-3 border-b border-gray-300/20">
+              <div className="w-8 h-8 bg-gray-400/50 rounded-md p-1.5"></div> {/* Icon bg */}
+              <div>
+                <div className="h-5 bg-gray-400 rounded w-48 mb-1"></div> {/* Report Title */}
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* Report Skeleton */}
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="h-6 bg-gray-200 rounded w-32 animate-pulse mb-4"></div>
-          
-          <div className="bg-white rounded-lg shadow-sm">
-            {/* Patient Header Skeleton */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-t-lg border-b">
-              <div className="h-6 bg-gray-200 rounded w-64 animate-pulse mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-48 animate-pulse"></div>
+            {/* Report Summary Card Skeleton */}
+            <div className="p-4 bg-gray-200/30 backdrop-blur-sm">
+              <div className="h-4 bg-gray-300 rounded w-3/4 mb-2"></div> {/* Summary Statement */}
+              <div className="h-3 bg-gray-300 rounded w-1/2 mb-1"></div> {/* Key Metric 1 */}
+              <div className="h-3 bg-gray-300 rounded w-1/3"></div>    {/* Key Metric 2 */}
             </div>
             
-            {/* Report Sections Skeleton */}
-            <div className="p-6 space-y-6">
-              {/* Findings Section */}
-              <div className="border-l-4 border-blue-500 bg-blue-50 p-4 rounded-r-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-5 bg-gray-200 rounded w-20 animate-pulse"></div>
+            {/* Report Content Area Skeleton */}
+            <div className="p-4 space-y-4 bg-gray-200/20 backdrop-blur-sm">
+              {/* Findings Section Skeleton */}
+              <div className="bg-gray-300/20 backdrop-blur-sm rounded-lg p-3 border-l-4 border-gray-400">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 bg-gray-400/30 rounded"></div> {/* Icon */}
+                  <div className="h-4 bg-gray-400 rounded w-20"></div> {/* Section Title */}
                 </div>
                 <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded w-4/6 animate-pulse"></div>
+                  <div className="h-3 bg-gray-400 rounded w-full"></div>
+                  <div className="h-3 bg-gray-400 rounded w-5/6"></div>
+                  <div className="h-3 bg-gray-400 rounded w-4/6 flex items-center gap-1">
+                     <span className="inline-block h-3 w-12 bg-gray-500/30 rounded-sm"></span> {/* Severity Tag */}
+                  </div>
                 </div>
               </div>
               
-              {/* Impression Section */}
-              <div className="border-l-4 border-green-500 bg-green-50 p-4 rounded-r-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-5 bg-gray-200 rounded w-24 animate-pulse"></div>
+              {/* Impression Section Skeleton */}
+              <div className="bg-gray-300/20 backdrop-blur-sm rounded-lg p-3 border-l-4 border-gray-400">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 bg-gray-400/30 rounded"></div> {/* Icon */}
+                  <div className="h-4 bg-gray-400 rounded w-24"></div> {/* Section Title */}
                 </div>
                 <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                  <div className="h-3 bg-gray-400 rounded w-full"></div>
+                  <div className="h-3 bg-gray-400 rounded w-3/4"></div>
                 </div>
               </div>
               
-              {/* Next Steps Section */}
-              <div className="border-l-4 border-orange-500 bg-orange-50 p-4 rounded-r-lg">
-                <div className="flex items-center gap-2 mb-3">
-                  <div className="w-5 h-5 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-5 bg-gray-200 rounded w-28 animate-pulse"></div>
+              {/* Next Steps Section Skeleton */}
+              <div className="bg-gray-300/20 backdrop-blur-sm rounded-lg p-3 border-l-4 border-gray-400">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-5 h-5 bg-gray-400/30 rounded"></div> {/* Icon */}
+                  <div className="h-4 bg-gray-400 rounded w-28"></div> {/* Section Title */}
                 </div>
                 <div className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded w-4/6 animate-pulse"></div>
+                  <div className="h-3 bg-gray-400 rounded w-5/6"></div>
+                  <div className="h-3 bg-gray-400 rounded w-4/6"></div>
                 </div>
               </div>
             </div>
             
             {/* Disclaimer Skeleton */}
-            <div className="px-6 pb-6">
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <div className="h-4 bg-gray-200 rounded w-3/4 animate-pulse mb-1"></div>
-                <div className="h-3 bg-gray-200 rounded w-full animate-pulse"></div>
+            <div className="p-4 bg-gray-200/30 backdrop-blur-sm rounded-b-lg">
+              <div className="bg-gray-300/20 p-3 rounded-lg border border-gray-400/20">
+                <div className="h-3 bg-gray-400 rounded w-3/4 mb-1"></div>
+                <div className="h-3 bg-gray-400 rounded w-full"></div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Loading Indicator */}
-        <div className="fixed bottom-6 right-6">
-          <div className="bg-white rounded-lg shadow-lg p-4 flex items-center gap-3">
-            <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-            <span className="text-sm font-medium text-gray-700">Loading patient data...</span>
           </div>
         </div>
       </main>
