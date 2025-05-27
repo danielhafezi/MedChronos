@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin, Download } from 'lucide-react' // Added Download
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, Sparkles, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin, Download } from 'lucide-react' // Added Download, Sparkles; removed MessageSquareText
 import ReportDisplay from '@/app/components/ReportDisplay'
 import PatientChat from '@/app/components/PatientChat' // Import PatientChat
 import Breadcrumb from '@/app/components/Breadcrumb'
@@ -595,14 +595,6 @@ export default function PatientPage() {
             <Upload className="w-4 h-4" />
             Upload Imaging
           </button>
-          <button
-            onClick={() => setIsChatOpen(true)}
-            disabled={!patient || patient.reports.length === 0} // Enable if patient and reports exist
-            className="flex items-center gap-2 bg-medical-primary-light text-white px-4 py-2 rounded-lg hover:bg-medical-primary disabled:bg-medical-neutral-400"
-          >
-            <MessageSquareText className="w-4 h-4" />
-            Chat with Report
-          </button>
         </div>
       </div>
 
@@ -746,7 +738,17 @@ export default function PatientPage() {
       {/* Latest Report */}
       {latestReport && (
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <h2 className="text-lg font-semibold mb-4">Latest Report</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Latest Report</h2>
+            <button
+              onClick={() => setIsChatOpen(true)}
+              disabled={!patient || patient.reports.length === 0}
+              className="flex items-center gap-2 bg-medical-primary-light text-white px-3 py-1.5 rounded-lg hover:bg-medical-primary disabled:bg-medical-neutral-400"
+            >
+              <Sparkles className="w-4 h-4" />
+              Chat with Report
+            </button>
+          </div>
           <ReportDisplay 
             report={latestReport} 
             patient={patient} 
