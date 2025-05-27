@@ -660,7 +660,7 @@ export default function PatientPage() {
                       className={`${theme.bgClass} rounded-lg p-3 min-w-[240px] max-w-[280px] border-2 shadow-sm hover:shadow-md transition-all duration-200 relative group transform hover:-translate-y-1`}
                     >
                       {/* Edit/Delete buttons */}
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="absolute top-4 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -688,35 +688,34 @@ export default function PatientPage() {
                         onClick={() => setSelectedStudy(study)}
                       >
                         {/* Header with Icon and Date */}
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className={`p-1.5 rounded-md ${theme.iconClass} bg-white/50`}>
-                              <ModalityIcon className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-gray-500" />
-                                <span className="text-xs text-gray-600 font-medium">
-                                  {new Date(study.imagingDatetime).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    year: 'numeric'
-                                  })}
-                                </span>
-                              </div>
-                            </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className={`p-1.5 rounded-md ${theme.iconClass} bg-white/50`}>
+                            <ModalityIcon className="w-4 h-4" />
                           </div>
-                          
-                          {/* Image Count Badge */}
-                          <div className={`${theme.badgeClass} px-1.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1`}>
-                            <ImageIcon className="w-3 h-3" />
-                            {study.images.length}
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-gray-500" />
+                              <span className="text-xs text-gray-600 font-medium">
+                                {new Date(study.imagingDatetime).toLocaleDateString('en-US', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  year: 'numeric'
+                                })}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         
                         {/* Title and Modality */}
                         <div className="mb-2">
-                          <h3 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{study.title}</h3>
+                          <div className="flex items-start justify-between mb-1">
+                            <h3 className="font-semibold text-sm text-gray-900 line-clamp-2 flex-1 pr-2">{study.title}</h3>
+                            {/* Image Count Badge - positioned to avoid collision with edit/delete buttons */}
+                            <div className={`${theme.badgeClass} px-1.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1 flex-shrink-0 ml-2`}>
+                              <ImageIcon className="w-3 h-3" />
+                              {study.images.length}
+                            </div>
+                          </div>
                           {study.modality && (
                             <div className="flex items-center gap-1">
                               <MapPin className="w-3 h-3 text-gray-400" />
