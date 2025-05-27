@@ -993,7 +993,7 @@ export default function PatientPage() {
                   title="Refresh AI captions and summary"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshingStudyId === selectedStudy.id ? 'animate-spin' : ''}`} />
-                  {refreshingStudyId === selectedStudy.id ? 'Refreshing...' : 'Refresh AI'}
+                  {refreshingStudyId === selectedStudy.id ? 'Refreshing...' : ''}
                 </button>
                 <button
                   onClick={() => setSelectedStudy(null)}
