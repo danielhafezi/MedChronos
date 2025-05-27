@@ -578,8 +578,7 @@ export default function PatientPage() {
       <div className="max-w-7xl mx-auto px-4 pt-4">
         <Breadcrumb 
           items={[
-            { label: patient.name, href: `/patients/${patient.id}` },
-            { label: 'Timeline' }
+            { label: patient.name } // Display patient name as the current page
           ]} 
           className="mb-4"
         />
