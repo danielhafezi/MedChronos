@@ -414,7 +414,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   if (!isOpen) return null
 
   return (
-    <div ref={chatContainerRef} className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col z-50 border-l border-gray-200">
+    <div ref={chatContainerRef} className="fixed top-0 right-0 h-full w-full md:max-w-md bg-white shadow-xl flex flex-col z-50 md:border-l md:border-gray-200">
       {/* Header */}
       <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
         <div className="flex justify-between items-center mb-2">
