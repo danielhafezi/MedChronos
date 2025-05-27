@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
-import type { PatientData, StudyData, ReportOutput } from '@/lib/ai/gemini'; // Assuming these types are exported
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, Content } from '@google/generative-ai'
+import type { PatientData, StudyData, ReportOutput } from '@/lib/ai/gemini';
 
 const prisma = new PrismaClient()
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 const proModel = genAI.getGenerativeModel({
-  model: 'gemini-2.5-pro-preview-05-06',
-  safetySettings: [ // Add safety settings to reduce likelihood of blocked responses
+  model: 'gemini-1.5-pro-latest', // Using 1.5 Pro for better streaming and context
+  safetySettings: [
     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
     { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     const studies = await prisma.study.findMany({
       where: { patientId },
       orderBy: { imagingDatetime: 'asc' },
-      select: { id: true, title: true, imagingDatetime: true, seriesSummary: true }, // Select only needed fields
+      select: { id: true, title: true, imagingDatetime: true, seriesSummary: true, modality: true },
     })
 
     // 3. Fetch Latest Report Data
@@ -49,17 +49,15 @@ export async function POST(req: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
 
-    if (!reportRecord || !reportRecord.geminiJson) {
-      return NextResponse.json({ error: 'Latest report not found for this patient' }, { status: 404 })
+    let reportOutput: ReportOutput | null = null;
+    if (reportRecord && reportRecord.geminiJson) {
+        reportOutput = reportRecord.geminiJson as unknown as ReportOutput;
     }
     
-    const reportOutput = reportRecord.geminiJson as unknown as ReportOutput;
-
-
     // 4. Construct System Prompt
     let systemPrompt = `You are MedChronos AI, a helpful medical assistant. Your role is to discuss the patient's medical information based *solely* on the context provided below. Do not infer, speculate, or provide medical advice beyond what is explicitly stated in the reports and summaries.
 
-IMPORTANT: When referencing information from specific studies, you MUST include citations in the format [CITE:study_id]. For example, if referencing information from study with ID "abc123", write [CITE:abc123]. You can cite multiple studies like [CITE:study1_id,study2_id].
+IMPORTANT: When referencing information from specific studies, you MUST include citations in the format [CITE:study_id]. For example, if referencing information from study with ID "abc123", write [CITE:abc123]. You can cite multiple studies like [CITE:study_id1,study_id2].
 
 Patient Information:
 - Name: ${patient.name}
@@ -74,60 +72,63 @@ ${studies
 Study ${index + 1}:
 - ID: ${study.id}
 - Title: ${study.title}
+- Modality: ${study.modality || 'N/A'}
 - Date: ${study.imagingDatetime.toLocaleDateString()}
-- Summary: ${study.seriesSummary}`
+- Summary: ${study.seriesSummary || 'No summary available.'}`
   )
   .join('\n')}
 
-Latest Comprehensive Report:
-Findings:
-${reportOutput.findings}
-
-Impression:
-${reportOutput.impression}
-
-Next Steps/Recommendations:
-${reportOutput.next_steps}
-
+Latest Comprehensive Report (${reportOutput ? new Date(reportRecord!.createdAt).toLocaleDateString() : 'N/A'}):
+${reportOutput 
+  ? `Findings:\n${reportOutput.findings}\n\nImpression:\n${reportOutput.impression}\n\nNext Steps/Recommendations:\n${reportOutput.next_steps}`
+  : 'No detailed report available.'
+}
 ---
 Based on this information, please answer the user's questions. Always cite the specific study IDs when referring to information from particular studies. If the information is not available in the provided context, state that clearly.
 `
     // 5. Construct conversation history for Gemini
-    const conversationHistory = messages.slice(0, -1); // All messages except the last one (current user query)
-    const currentUserMessageContent = messages[messages.length - 1].parts; // This is an array, e.g. [{text: "User query"}]
+    const conversationHistory: Content[] = messages.slice(0, -1).map(msg => ({
+      role: msg.role,
+      parts: msg.parts.map(part => ({ text: part.text }))
+    }));
+    
+    const currentUserMessageContent = messages[messages.length - 1].parts[0].text;
 
-    // Ensure history for startChat is either empty or starts with a 'user' role.
-    let processedHistory = [...conversationHistory]; // Work with a mutable copy
-
-    // If the conversationHistory (which is messages from client MINUS the current user query)
-    // is not empty and its first message is from the 'model' (our welcome message),
-    // we remove it so the history passed to the SDK starts with a 'user' message or is empty.
+    let processedHistory = [...conversationHistory];
     if (processedHistory.length > 0 && processedHistory[0].role === 'model') {
-      processedHistory.shift(); // Removes the first element
+      processedHistory.shift(); 
     }
-    // Now, processedHistory is suitable for the SDK:
-    // - If original conversationHistory was [model_welcome], processedHistory is [].
-    // - If original conversationHistory was [model_welcome, user_q1, model_a1], processedHistory is [user_q1, model_a1].
-    // - If original conversationHistory was [user_q1, model_a1], processedHistory is [user_q1, model_a1].
-    // - If original conversationHistory was [], processedHistory is [].
     
     const chat = proModel.startChat({
         systemInstruction: {
-          role: 'model', // System instructions are often set as a model's initial turn or context
+          role: 'model', 
           parts: [{ text: systemPrompt }],
         },
-        history: processedHistory, // Pass the processed history
-        // generationConfig: { // Optional: configure temperature, topK, etc.
-        //   maxOutputTokens: 2000,
-        // },
+        history: processedHistory,
       });
     
-    // Send only the current user's message parts
-    const result = await chat.sendMessage(currentUserMessageContent);
-    const response = result.response;
-    const text = response.text();
+    const result = await chat.sendMessageStream(currentUserMessageContent);
 
-    return NextResponse.json({ reply: text })
+    // Create a streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            controller.enqueue(new TextEncoder().encode(chunkText));
+          }
+        } catch (error) {
+          console.error('Error during stream generation:', error);
+          controller.error(error);
+        }
+        controller.close();
+      },
+    });
+
+    return new Response(stream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+
   } catch (error) {
     console.error('Error in chat API:', error)
     if (error instanceof Error && error.message.includes('SAFETY')) {

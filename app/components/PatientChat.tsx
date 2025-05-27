@@ -281,24 +281,60 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         throw new Error(errorData.error || 'Failed to get response from AI')
       }
 
-      const data = await response.json()
-      const modelMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.reply,
-        createdAt: new Date().toISOString()
+      if (!response.body) {
+        throw new Error('Response body is null')
       }
-      setMessages(prev => [...prev, modelMessage])
 
-      // Save AI response to database
-      await fetch(`/api/chats/${currentChat.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let accumulatedResponse = ''
+      const assistantMessageId = (Date.now() + 1).toString()
+
+      // Add a placeholder for the assistant's message
+      setMessages(prev => [
+        ...prev,
+        {
+          id: assistantMessageId,
           role: 'assistant',
-          content: modelMessage.content
+          content: '', // Start with empty content
+          createdAt: new Date().toISOString(),
+        },
+      ])
+
+      let firstChunk = true
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        const chunkText = decoder.decode(value, { stream: true })
+        accumulatedResponse += chunkText
+
+        // Update the specific assistant message content
+        setMessages(prevMessages =>
+          prevMessages.map(msg =>
+            msg.id === assistantMessageId
+              ? { ...msg, content: accumulatedResponse }
+              : msg
+          )
+        )
+        if (firstChunk) {
+          setIsLoading(false) // Stop full loading indicator after first chunk
+          firstChunk = false
+        }
+      }
+      
+      // Final message content is in accumulatedResponse
+      // Save AI response to database after stream is complete
+      if (currentChat && accumulatedResponse) {
+        await fetch(`/api/chats/${currentChat.id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: 'assistant',
+            content: accumulatedResponse,
+          }),
         })
-      })
+      }
 
       // Generate a better title after the first real exchange
       if (messages.length === 1) { // Only welcome message exists
@@ -337,7 +373,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       }
       setMessages(prev => [...prev, errorMessage])
     } finally {
-      setIsLoading(false)
+      // setIsLoading(false) // Already set to false after first chunk or if error
     }
   }
 
