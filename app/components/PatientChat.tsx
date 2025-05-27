@@ -1,15 +1,27 @@
 'use client'
 
 import { useState, useEffect, useRef, FormEvent } from 'react'
-import { Send, X, MessageCircle, Loader2 } from 'lucide-react'
+import { Send, X, MessageCircle, Loader2, History, Plus, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 interface Message {
   id: string
-  role: 'user' | 'model'
-  text: string
-  timestamp: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
+}
+
+interface Chat {
+  id: string
+  title: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+  messages: Message[]
+  _count?: {
+    messages: number
+  }
 }
 
 interface Study {
@@ -24,16 +36,44 @@ interface PatientChatProps {
   patientId: string
   isOpen: boolean
   onClose: () => void
-  patientName?: string // Optional: for a more personalized welcome
+  patientName?: string
   studies?: Study[]
   onCitationClick: (studyId: string) => void
 }
 
 const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, patientName, studies = [], onCitationClick }) => {
+  const [currentChat, setCurrentChat] = useState<Chat | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [chatHistory, setChatHistory] = useState<Chat[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [isCreatingChat, setIsCreatingChat] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Delete a chat
+  const deleteChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        setChatHistory(prev => prev.filter(chat => chat.id !== chatId))
+        if (currentChat?.id === chatId) {
+          // If current chat is deleted, load another or create new
+          const nextChat = chatHistory.find(chat => chat.id !== chatId && chat.isActive) || chatHistory.find(chat => chat.id !== chatId)
+          if (nextChat) {
+            loadChat(nextChat.id)
+          } else {
+            createNewChat()
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting chat:', error)
+    }
+  }
 
   // Create a map of study IDs to study objects for easy lookup
   const studyMap = new Map<string, Study>()
@@ -41,19 +81,114 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
     studyMap.set(study.id, study)
   })
 
+  // Load chat history
+  const loadChatHistory = async () => {
+    setIsLoadingHistory(true)
+    try {
+      const response = await fetch(`/api/chats?patientId=${patientId}`)
+      if (response.ok) {
+        const chats = await response.json()
+        setChatHistory(chats)
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  // Load a specific chat
+  const loadChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chats/${chatId}`)
+      if (response.ok) {
+        const chat = await response.json()
+        setCurrentChat(chat)
+        setMessages(chat.messages || [])
+        setShowHistory(false)
+        
+        // Set this chat as active
+        await fetch(`/api/chats/${chatId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isActive: true })
+        })
+      }
+    } catch (error) {
+      console.error('Error loading chat:', error)
+    }
+  }
+
+  // Create a new chat
+  const createNewChat = async () => {
+    setIsCreatingChat(true)
+    try {
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patientId })
+      })
+      
+      if (response.ok) {
+        const newChat = await response.json()
+        setCurrentChat(newChat)
+        setMessages([])
+        await loadChatHistory() // Refresh history
+        
+        // Add welcome message
+        const welcomeMessage = {
+          id: Date.now().toString(),
+          role: 'assistant' as const,
+          content: `Hello! I am MedChronos AI. I can help you discuss ${patientName ? patientName + "'s" : "this patient's"} medical information, including study summaries and the latest report. How can I assist you today?`,
+          createdAt: new Date().toISOString()
+        }
+        setMessages([welcomeMessage])
+        
+        // Save welcome message to database
+        if (newChat.id) {
+          await fetch(`/api/chats/${newChat.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              role: 'assistant',
+              content: welcomeMessage.content
+            })
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Error creating new chat:', error)
+    } finally {
+      setIsCreatingChat(false)
+    }
+  }
+
+  // Load active chat or create new one on mount
+  useEffect(() => {
+    if (isOpen && !currentChat) {
+      loadChatHistory().then(() => {
+        // Find active chat or create new one
+        const activeChat = chatHistory.find(chat => chat.isActive)
+        if (activeChat) {
+          loadChat(activeChat.id)
+        } else {
+          createNewChat()
+        }
+      })
+    }
+  }, [isOpen])
+
   // Process text to replace citations with clickable numbers
   const processCitations = (text: string): JSX.Element[] => {
     const parts: JSX.Element[] = []
     let lastIndex = 0
     
-    // Find all citations in the text
     const citationPattern = /\[CITE:([^\]]+)\]/g
     let match
     let citationNumber = 1
     const usedCitations = new Map<string, number>()
     
     while ((match = citationPattern.exec(text)) !== null) {
-      // Add text before citation
       if (match.index > lastIndex) {
         parts.push(
           <span key={`text-${lastIndex}`}>
@@ -62,7 +197,6 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         )
       }
       
-      // Process citation
       const citationIds = match[1].split(',').map(id => id.trim())
       const citationNumbers: number[] = []
       
@@ -73,7 +207,6 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         citationNumbers.push(usedCitations.get(studyId)!)
       })
       
-      // Add clickable citation
       parts.push(
         <sup key={`cite-${match.index}`} className="ml-0.5">
           <button
@@ -89,7 +222,6 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       lastIndex = match.index + match[0].length
     }
     
-    // Add remaining text
     if (lastIndex < text.length) {
       parts.push(
         <span key={`text-${lastIndex}`}>
@@ -107,44 +239,36 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
 
   useEffect(scrollToBottom, [messages])
 
-  useEffect(() => {
-    if (isOpen && messages.length === 0) {
-      setMessages([
-        {
-          id: Date.now().toString(),
-          role: 'model',
-          text: `Hello! I am MedChronos AI. I can help you discuss ${patientName ? patientName + "'s" : "this patient's"} medical information, including study summaries and the latest report. How can I assist you today?`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }
-      ])
-    }
-  }, [isOpen, messages.length, patientName])
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading || !currentChat) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
-      text: inputValue.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      content: inputValue.trim(),
+      createdAt: new Date().toISOString()
     }
-    setMessages((prevMessages) => [...prevMessages, userMessage])
+    setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setIsLoading(true)
 
     try {
-      // Prepare messages for the API (role and parts structure)
-      const apiMessages = [...messages, userMessage].map(msg => ({
-        role: msg.role,
-        parts: [{ text: msg.text }]
-      }));
-      
-      // The last message sent to API should be the current user message
-      // So, the history sent to API should be the current `messages` state,
-      // and the new user message is part of the current query.
-      // The API route is designed to take the full history and extract the last user message.
+      // Save user message to database
+      await fetch(`/api/chats/${currentChat.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'user',
+          content: userMessage.content
+        })
+      })
+
+      // Prepare messages for the API
+      const apiMessages = messages.concat(userMessage).map(msg => ({
+        role: msg.role === 'assistant' ? 'model' : msg.role,
+        parts: [{ text: msg.content }]
+      }))
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -159,21 +283,59 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
 
       const data = await response.json()
       const modelMessage: Message = {
-        id: (Date.now() + 1).toString(), // Ensure unique ID
-        role: 'model',
-        text: data.reply,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: data.reply,
+        createdAt: new Date().toISOString()
       }
-      setMessages((prevMessages) => [...prevMessages, modelMessage])
+      setMessages(prev => [...prev, modelMessage])
+
+      // Save AI response to database
+      await fetch(`/api/chats/${currentChat.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          role: 'assistant',
+          content: modelMessage.content
+        })
+      })
+
+      // Generate a better title after the first real exchange
+      if (messages.length === 1) { // Only welcome message exists
+        // Try to generate AI title
+        try {
+          const titleResponse = await fetch(`/api/chats/${currentChat.id}/generate-title`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+          })
+          
+          if (titleResponse.ok) {
+            const { title } = await titleResponse.json()
+            // Update local state
+            setCurrentChat(prev => prev ? { ...prev, title } : prev)
+            // Refresh chat history
+            await loadChatHistory()
+          }
+        } catch (titleError) {
+          console.error('Error generating title:', titleError)
+          // Fallback to simple title
+          const title = userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : '')
+          await fetch(`/api/chats/${currentChat.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title })
+          })
+        }
+      }
     } catch (error) {
       console.error('Chat API error:', error)
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        role: 'model',
-        text: error instanceof Error ? error.message : 'Sorry, something went wrong. Please try again.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        role: 'assistant',
+        content: error instanceof Error ? error.message : 'Sorry, something went wrong. Please try again.',
+        createdAt: new Date().toISOString()
       }
-      setMessages((prevMessages) => [...prevMessages, errorMessage])
+      setMessages(prev => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
@@ -184,15 +346,95 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   return (
     <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col z-50 border-l border-gray-200">
       {/* Header */}
-      <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white flex justify-between items-center">
-        <div className="flex items-center">
-          <MessageCircle size={24} className="mr-2" />
-          <h2 className="text-lg font-semibold">Chat with Patient Report</h2>
+      <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center">
+            <MessageCircle size={24} className="mr-2" />
+            <h2 className="text-lg font-semibold">Chat with Patient Report</h2>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              title="Chat History"
+            >
+              <History size={20} />
+            </button>
+            <button
+              onClick={createNewChat}
+              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              title="New Chat"
+              disabled={isCreatingChat}
+            >
+              {isCreatingChat ? <Loader2 size={20} className="animate-spin" /> : <Plus size={20} />}
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
-        <button onClick={onClose} className="text-white hover:text-gray-200">
-          <X size={24} />
-        </button>
+        {currentChat && (
+          <div className="text-sm text-white/80">
+            {currentChat.title}
+          </div>
+        )}
       </div>
+
+      {/* Chat History Panel */}
+      {showHistory && (
+        <div className="absolute top-16 right-4 w-72 max-h-96 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-10">
+          <div className="p-3 border-b border-gray-200 bg-gray-50">
+            <h3 className="font-semibold text-gray-800">Chat History</h3>
+          </div>
+          <div className="overflow-y-auto max-h-80">
+            {isLoadingHistory ? (
+              <div className="p-4 text-center text-gray-500">
+                <Loader2 size={20} className="animate-spin mx-auto mb-2" />
+                Loading history...
+              </div>
+            ) : chatHistory.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">
+                No chat history yet
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {chatHistory.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                      chat.id === currentChat?.id ? 'bg-blue-50' : ''
+                    }`}
+                  >
+                    <button 
+                      onClick={() => loadChat(chat.id)} 
+                      className="flex-grow text-left"
+                    >
+                      <div className="font-medium text-gray-800 text-sm mb-1 truncate">
+                        {chat.title}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(chat.updatedAt).toLocaleDateString()} · {chat._count?.messages || 0} messages
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation() // Prevent loading chat when deleting
+                        if (window.confirm(`Are you sure you want to delete "${chat.title}"?`)) {
+                          deleteChat(chat.id)
+                        }
+                      }}
+                      className="p-1 text-red-500 hover:text-red-700 rounded-md hover:bg-red-100 transition-colors ml-2 flex-shrink-0"
+                      title="Delete Chat"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50">
@@ -205,14 +447,12 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                   : 'bg-gray-200 text-gray-800 rounded-bl-none'
               }`}
             >
-              {msg.role === 'model' ? (
-                // Process citations for model messages
+              {msg.role === 'assistant' ? (
                 <div className="prose prose-sm max-w-none text-gray-800">
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
                       p: ({ children }: any) => {
-                        // Process text nodes for citations
                         const processedChildren = Array.isArray(children) 
                           ? children.map((child, index) => {
                               if (typeof child === 'string') {
@@ -229,7 +469,6 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                       ul: ({ children }: any) => <ul className="list-disc pl-5 space-y-1">{children}</ul>,
                       ol: ({ children }: any) => <ol className="list-decimal pl-5 space-y-1">{children}</ol>,
                       li: ({ children }: any) => {
-                        // Process text nodes for citations in list items
                         const processedChildren = Array.isArray(children) 
                           ? children.map((child, index) => {
                               if (typeof child === 'string') {
@@ -245,19 +484,18 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                       },
                     }}
                   >
-                    {msg.text}
+                    {msg.content}
                   </ReactMarkdown>
                 </div>
               ) : (
-                // Regular rendering for user messages
                 <div className="prose prose-sm max-w-none text-white">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.text}
+                    {msg.content}
                   </ReactMarkdown>
                 </div>
               )}
               <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-blue-200 text-right' : 'text-gray-500 text-left'}`}>
-                {msg.timestamp}
+                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
           </div>
@@ -282,12 +520,12 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="Ask about the patient report..."
             className="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            disabled={isLoading}
+            disabled={isLoading || !currentChat}
           />
           <button
             type="submit"
             className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center justify-center w-10 h-10"
-            disabled={isLoading || !inputValue.trim()}
+            disabled={isLoading || !inputValue.trim() || !currentChat}
           >
             {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
           </button>

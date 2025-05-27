@@ -21,6 +21,7 @@ model Patient {
   
   studies          Study[]
   reports          Report[]
+  chats            Chat[]
   
   @@map("patients")
 }
@@ -65,4 +66,30 @@ model Report {
   patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   
   @@map("reports")
+}
+
+model Chat {
+  id          String   @id @default(uuid())
+  patientId   String   @map("patient_id")
+  title       String   @default("New Chat")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  messages    ChatMessage[]
+  
+  @@map("chats")
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  chatId      String   @map("chat_id")
+  role        String   // 'user' or 'assistant'
+  content     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  chat        Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  
+  @@map("chat_messages")
 }
