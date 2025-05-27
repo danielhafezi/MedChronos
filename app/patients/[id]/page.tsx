@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin, Download } from 'lucide-react' // Added Download
 import ReportDisplay from '@/app/components/ReportDisplay'
 import PatientChat from '@/app/components/PatientChat' // Import PatientChat
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
@@ -599,6 +599,21 @@ export default function PatientPage() {
             <MessageSquareText className="w-4 h-4" />
             Chat with Report
           </button>
+          {/* Export to PDF Button */}
+          {latestReport && (
+            <button
+              onClick={() => {
+                if (latestReport && latestReport.id) {
+                  window.open(`/api/reports/${latestReport.id}/export-pdf`, '_blank');
+                }
+              }}
+              className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+              title="Export latest report to PDF"
+            >
+              <Download className="w-4 h-4" />
+              Export PDF
+            </button>
+          )}
         </div>
       </div>
 
