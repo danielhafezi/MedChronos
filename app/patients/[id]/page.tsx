@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin } from 'lucide-react'
 import ReportDisplay from '@/app/components/ReportDisplay'
 import PatientChat from '@/app/components/PatientChat' // Import PatientChat
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
@@ -43,6 +43,58 @@ interface Report {
   geminiJson: any
   createdAt: string
 }
+
+// Utility function to get modality theme and icon
+const getModalityTheme = (modality: string | null) => {
+  const modalityLower = modality?.toLowerCase() || '';
+  
+  if (modalityLower.includes('ct')) {
+    return {
+      color: 'blue',
+      icon: Monitor,
+      bgClass: 'bg-blue-50 border-blue-200 hover:bg-blue-100',
+      iconClass: 'text-blue-600',
+      badgeClass: 'bg-blue-100 text-blue-800',
+      timelineClass: 'bg-blue-500'
+    };
+  } else if (modalityLower.includes('mri')) {
+    return {
+      color: 'purple',
+      icon: Brain,
+      bgClass: 'bg-purple-50 border-purple-200 hover:bg-purple-100',
+      iconClass: 'text-purple-600',
+      badgeClass: 'bg-purple-100 text-purple-800',
+      timelineClass: 'bg-purple-500'
+    };
+  } else if (modalityLower.includes('x-ray') || modalityLower.includes('xray')) {
+    return {
+      color: 'green',
+      icon: Zap,
+      bgClass: 'bg-green-50 border-green-200 hover:bg-green-100',
+      iconClass: 'text-green-600',
+      badgeClass: 'bg-green-100 text-green-800',
+      timelineClass: 'bg-green-500'
+    };
+  } else if (modalityLower.includes('ultrasound') || modalityLower.includes('us')) {
+    return {
+      color: 'orange',
+      icon: Waves,
+      bgClass: 'bg-orange-50 border-orange-200 hover:bg-orange-100',
+      iconClass: 'text-orange-600',
+      badgeClass: 'bg-orange-100 text-orange-800',
+      timelineClass: 'bg-orange-500'
+    };
+  } else {
+    return {
+      color: 'gray',
+      icon: Stethoscope,
+      bgClass: 'bg-gray-50 border-gray-200 hover:bg-gray-100',
+      iconClass: 'text-gray-600',
+      badgeClass: 'bg-gray-100 text-gray-800',
+      timelineClass: 'bg-gray-500'
+    };
+  }
+};
 
 export default function PatientPage() {
   const params = useParams()
@@ -569,71 +621,110 @@ export default function PatientPage() {
             No imaging studies yet. Upload your first study to get started.
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {patient.studies.map((study) => (
-              <div
-                key={study.id}
-                id={`study-${study.id}`}
-                className="bg-white rounded-lg p-4 min-w-[300px] hover:shadow-md transition relative group"
-              >
-                {/* Edit/Delete buttons */}
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleStartEdit(study)
-                    }}
-                    className="p-1.5 hover:bg-gray-100 rounded-lg"
-                    title="Edit study"
-                  >
-                    <Edit2 className="w-4 h-4 text-gray-600" />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteStudy(study)
-                    }}
-                    className="p-1.5 hover:bg-red-50 rounded-lg"
-                    title="Delete study"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
-
-                <div 
-                  className="cursor-pointer"
-                  onClick={() => setSelectedStudy(study)}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Calendar className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-gray-600">
-                      {new Date(study.imagingDatetime).toLocaleDateString()}
-                    </span>
-                  </div>
-                  
-                  <h3 className="font-semibold">{study.title}</h3>
-                  
-                  {study.modality && (
-                    <p className="text-sm text-gray-500">{study.modality}</p>
-                  )}
-                  <p className="text-sm text-gray-600 mt-2">{study.images.length} images</p>
-                  <div className="mt-3 text-sm text-gray-700 line-clamp-3">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={{
-                        p: ({ children }) => <p className="mb-0">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc list-inside">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside">{children}</ol>,
-                        li: ({ children }) => <li className="mb-0">{children}</li>,
-                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                      }}
+          <div className="relative">
+            {/* Timeline Line */}
+            <div className="absolute top-20 left-0 right-0 h-0.5 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 z-0"></div>
+            
+            <div className="flex gap-6 overflow-x-auto pb-4 relative z-10">
+              {patient.studies.map((study, index) => {
+                const theme = getModalityTheme(study.modality);
+                const ModalityIcon = theme.icon;
+                
+                return (
+                  <div key={study.id} className="relative flex-shrink-0">
+                    
+                    {/* Study Card */}
+                    <div
+                      id={`study-${study.id}`}
+                      className={`${theme.bgClass} rounded-lg p-3 min-w-[240px] max-w-[280px] border-2 shadow-sm hover:shadow-md transition-all duration-200 relative group transform hover:-translate-y-1`}
                     >
-                      {study.seriesSummary}
-                    </ReactMarkdown>
+                      {/* Edit/Delete buttons */}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleStartEdit(study)
+                          }}
+                          className="p-1 hover:bg-white/50 rounded-md backdrop-blur-sm"
+                          title="Edit study"
+                        >
+                          <Edit2 className="w-3 h-3 text-gray-600" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteStudy(study)
+                          }}
+                          className="p-1 hover:bg-red-50 rounded-md backdrop-blur-sm"
+                          title="Delete study"
+                        >
+                          <Trash2 className="w-3 h-3 text-red-600" />
+                        </button>
+                      </div>
+
+                      <div 
+                        className="cursor-pointer"
+                        onClick={() => setSelectedStudy(study)}
+                      >
+                        {/* Header with Icon and Date */}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`p-1.5 rounded-md ${theme.iconClass} bg-white/50`}>
+                              <ModalityIcon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-gray-500" />
+                                <span className="text-xs text-gray-600 font-medium">
+                                  {new Date(study.imagingDatetime).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Image Count Badge */}
+                          <div className={`${theme.badgeClass} px-1.5 py-0.5 rounded-full text-xs font-medium flex items-center gap-1`}>
+                            <ImageIcon className="w-3 h-3" />
+                            {study.images.length}
+                          </div>
+                        </div>
+                        
+                        {/* Title and Modality */}
+                        <div className="mb-2">
+                          <h3 className="font-semibold text-sm text-gray-900 mb-1 line-clamp-2">{study.title}</h3>
+                          {study.modality && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-gray-400" />
+                              <span className="text-xs text-gray-600 font-medium">{study.modality}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Study Summary */}
+                        <div className="text-xs text-gray-700 line-clamp-2">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              p: ({ children }) => <p className="mb-0">{children}</p>,
+                              ul: ({ children }) => <ul className="list-disc list-inside">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal list-inside">{children}</ol>,
+                              li: ({ children }) => <li className="mb-0">{children}</li>,
+                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>
+                            }}
+                          >
+                            {study.seriesSummary}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
