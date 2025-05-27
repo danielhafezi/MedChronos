@@ -158,14 +158,16 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 overflow-hidden">
         {/* Report Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+        <div className="bg-gradient-to-r from-medical-primary/20 to-medical-primary-light/15 backdrop-blur-sm border-b border-medical-primary/10 text-medical-primary p-6">
           <div className="flex items-center gap-3 mb-4">
-            <FileText className="w-8 h-8" />
+            <div className="bg-white/30 backdrop-blur-sm p-2 rounded-lg border border-white/20">
+              <FileText className="w-8 h-8" />
+            </div>
             <h2 className="text-2xl font-bold">Medical Imaging Report</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm opacity-90">
             <div className="flex items-center gap-2">
               <User className="w-4 h-4" />
               <span>{patient.name}</span>
@@ -182,14 +184,14 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
         </div>
 
         {/* Report Content */}
-        <div className="p-6 space-y-8">
+        <div className="p-6 space-y-8 bg-white/40 backdrop-blur-sm">
           {/* Findings Section */}
-          <div className="border-l-4 border-blue-500 pl-6">
+          <div className="border-l-4 border-medical-primary/40 pl-6 bg-white/30 backdrop-blur-sm rounded-r-lg p-4 border border-l-4 border-medical-primary/20">
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <FileSearch className="w-6 h-6 text-blue-600" />
+              <div className="bg-medical-primary/10 backdrop-blur-sm p-2 rounded-lg border border-medical-primary/20">
+                <FileSearch className="w-6 h-6 text-medical-primary" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Findings</h3>
+              <h3 className="text-xl font-bold text-medical-primary-dark">Findings</h3>
             </div>
             <div className="prose prose-gray max-w-none">
               <ReactMarkdown 
@@ -202,12 +204,12 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
           </div>
 
           {/* Impression Section */}
-          <div className="border-l-4 border-green-500 pl-6">
+          <div className="border-l-4 border-medical-success/40 pl-6 bg-white/30 backdrop-blur-sm rounded-r-lg p-4 border border-l-4 border-medical-success/20">
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-green-100 p-2 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+              <div className="bg-medical-success/10 backdrop-blur-sm p-2 rounded-lg border border-medical-success/20">
+                <CheckCircle className="w-6 h-6 text-medical-success" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Impression</h3>
+              <h3 className="text-xl font-bold text-medical-success-dark">Impression</h3>
             </div>
             <div className="prose prose-gray max-w-none">
               <ReactMarkdown 
@@ -220,12 +222,12 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
           </div>
 
           {/* Next Steps Section */}
-          <div className="border-l-4 border-orange-500 pl-6">
+          <div className="border-l-4 border-medical-warning/40 pl-6 bg-white/30 backdrop-blur-sm rounded-r-lg p-4 border border-l-4 border-medical-warning/20">
             <div className="flex items-center gap-3 mb-4">
-              <div className="bg-orange-100 p-2 rounded-lg">
-                <ChevronRight className="w-6 h-6 text-orange-600" />
+              <div className="bg-medical-warning/10 backdrop-blur-sm p-2 rounded-lg border border-medical-warning/20">
+                <ChevronRight className="w-6 h-6 text-medical-warning" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Next Steps</h3>
+              <h3 className="text-xl font-bold text-medical-warning-dark">Next Steps</h3>
             </div>
             <div className="prose prose-gray max-w-none">
               <ReactMarkdown 
@@ -238,10 +240,10 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
           </div>
 
           {/* Recommendations Box */}
-          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="mt-8 bg-medical-primary/5 backdrop-blur-sm border border-medical-primary/20 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5" />
-              <div className="text-sm text-blue-800">
+              <AlertCircle className="w-5 h-5 text-medical-primary mt-0.5" />
+              <div className="text-sm text-medical-primary-dark">
                 <p className="font-semibold mb-1">Clinical Correlation Required</p>
                 <p>This AI-generated report should be reviewed in conjunction with clinical findings and patient history. Final diagnosis and treatment decisions should be made by qualified healthcare professionals.</p>
               </div>
