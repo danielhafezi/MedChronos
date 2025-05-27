@@ -596,14 +596,6 @@ export default function PatientPage() {
             Upload Imaging
           </button>
           <button
-            onClick={() => setShowReportModal(true)}
-            disabled={patient.studies.length === 0}
-            className="flex items-center gap-2 bg-medical-success text-white px-4 py-2 rounded-lg hover:bg-medical-success-dark disabled:bg-medical-neutral-400"
-          >
-            <FileText className="w-4 h-4" />
-            Generate Report
-          </button>
-          <button
             onClick={() => setIsChatOpen(true)}
             disabled={!patient || patient.reports.length === 0} // Enable if patient and reports exist
             className="flex items-center gap-2 bg-medical-primary-light text-white px-4 py-2 rounded-lg hover:bg-medical-primary disabled:bg-medical-neutral-400"
@@ -616,7 +608,17 @@ export default function PatientPage() {
 
       {/* Timeline */}
       <div className="max-w-7xl mx-auto px-4 py-4">
-        <h2 className="text-lg font-semibold mb-4">Imaging Timeline</h2>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold">Imaging Timeline</h2>
+          <button
+            onClick={() => setShowReportModal(true)}
+            disabled={patient.studies.length === 0}
+            className="flex items-center gap-2 bg-[#c96442] text-white px-3 py-1.5 rounded-lg hover:bg-[#b05030] disabled:bg-medical-neutral-400"
+          >
+            <FileText className="w-4 h-4" />
+            Generate Report
+          </button>
+        </div>
         
         {/* Refresh Progress Indicator */}
         {refreshProgress && (
