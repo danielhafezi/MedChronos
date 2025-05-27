@@ -168,29 +168,22 @@ export async function POST(request: NextRequest) {
           `patients/${patientId}/studies/${study.id}`
         )
 
-        // Generate caption - try MedGemma first, fallback to Gemini
+        // Generate raw caption with MedGemma
         let rawCaption: string
-        try {
-          rawCaption = await withRetry(() => 
-            generateImageCaptionMedGemma(processed.base64)
-          )
-        } catch (error) {
-          console.log('MedGemma failed, falling back to Gemini for image caption')
-          rawCaption = await withRetry(() => 
-            generateImageCaptionGemini(processed.base64)
-          )
-        }
+        rawCaption = await withRetry(() => 
+          generateImageCaptionMedGemma(processed.base64)
+        )
 
-        // Enhance the caption using Gemini Flash for better readability
+        // Enhance the caption using Gemini Flash
         let enhancedCaption: string
         try {
           enhancedCaption = await enhanceMedGemmaCaption(rawCaption, index, files.length)
         } catch (error) {
-          console.error('Error enhancing caption:', error)
-          enhancedCaption = rawCaption // Fallback to raw caption
+          console.error('Error enhancing caption with Gemini Flash, using raw caption as fallback:', error)
+          enhancedCaption = rawCaption // Fallback to raw caption if enhancement fails
         }
 
-        // Save image record with both raw and enhanced captions
+        // Save image record with both captions
         const image = await prisma.image.create({
           data: {
             studyId: study.id,
@@ -206,29 +199,28 @@ export async function POST(request: NextRequest) {
 
       // Wait for all images to be processed
       const results = await Promise.all(imagePromises)
+      // Use enhanced captions for the primary summary
       const enhancedCaptions = results.map(r => r.enhancedCaption)
 
-      // Generate enhanced study summary using Gemini Flash with enhanced captions
+      // Generate study summary using Gemini Flash with enhanced captions
       let seriesSummary: string
       try {
         seriesSummary = await generateEnhancedStudySummary(
           enhancedCaptions,
-          finalTitle,
-          finalModality || undefined
+          finalTitle, // Use the determined finalTitle for the study
+          finalModality || undefined // Use the determined finalModality
         )
       } catch (error) {
-        console.error('Error generating enhanced summary, falling back to standard summary:', error)
-        // Fallback to standard summary generation if enhanced fails
-        const rawCaptions = results.map(r => r.rawCaption)
+        console.error('Error generating enhanced summary with Gemini Flash, falling back to MedGemma 27B:', error)
+        // Fallback to MedGemma 27B summary if Gemini Flash fails
+        const rawCaptions = results.map(r => r.rawCaption) // Use raw captions for MedGemma 27B
         try {
           seriesSummary = await withRetry(() => 
             generateSeriesSummaryMedGemma(rawCaptions)
           )
-        } catch (fallbackError) {
-          console.log('MedGemma 27B failed, falling back to Gemini for series summary')
-          seriesSummary = await withRetry(() => 
-            generateSeriesSummaryGemini(rawCaptions)
-          )
+        } catch (medGemmaError) {
+          console.error('MedGemma 27B summary also failed:', medGemmaError)
+          seriesSummary = "Error: Could not generate study summary." // Final fallback
         }
       }
 

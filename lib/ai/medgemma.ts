@@ -11,8 +11,20 @@ const LOCATION = process.env.VERTEX_AI_LOCATION!
 const MEDGEMMA_4B_ENDPOINT_ID = process.env.MEDGEMMA_4B_ENDPOINT_ID!
 const MEDGEMMA_27B_ENDPOINT_ID = process.env.MEDGEMMA_27B_ENDPOINT_ID!
 
+interface MedGemmaChatChoice {
+  message?: {
+    content?: string;
+  };
+  // Add other properties from 'choice' if needed, like 'finish_reason', 'index'
+}
+
+interface MedGemmaChatPredictions {
+  choices?: MedGemmaChatChoice[];
+  // Add other properties from 'predictions' object if needed
+}
+
 interface MedGemmaResponse {
-  predictions: any[]
+  predictions: MedGemmaChatPredictions | any; // More specific type or any for flexibility
   deployedModelId: string
   model: string
   modelDisplayName: string
@@ -32,10 +44,27 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
     
     const requestBody = {
       instances: [{
-        image: {
-          bytesBase64Encoded: imageBase64
-        },
-        prompt: "Describe this medical image in detail, including any notable findings, anatomical structures, and potential abnormalities."
+        "@requestFormat": "chatCompletions",
+        "messages": [
+          {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are an expert medical radiologist. Analyze medical images and provide detailed, accurate descriptions of findings."}]
+          },
+          {
+            "role": "user",
+            "content": [
+              {
+                "type": "text",
+                "text": "Describe this medical image in detail, including any notable findings, anatomical structures, and potential abnormalities."
+              },
+              {
+                "type": "image_url",
+                "image_url": {"url": `data:image/jpeg;base64,${imageBase64}`}
+              }
+            ]
+          }
+        ],
+        "max_tokens": 256
       }]
     }
 
@@ -58,12 +87,14 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
     
     console.log('MedGemma 4B Response:', JSON.stringify(data, null, 2))
     
-    // Extract the caption from the response
-    if (data.predictions && data.predictions.length > 0) {
-      // Try different possible field names
-      const prediction = data.predictions[0]
-      return prediction.text || prediction.content || prediction.output || JSON.stringify(prediction) || 'No caption generated'
+    // Extract the caption from the response (chat completions format)
+    if (data.predictions && typeof data.predictions === 'object' && !Array.isArray(data.predictions) && data.predictions.choices && data.predictions.choices.length > 0) {
+      const choice = data.predictions.choices[0]
+      if (choice.message && choice.message.content) {
+        return choice.message.content
+      }
     }
+    console.error('Unexpected MedGemma 4B response structure:', JSON.stringify(data, null, 2))
     
     return 'No caption generated'
   } catch (error) {
@@ -91,14 +122,24 @@ Study Summary:`
 
     const requestBody = {
       instances: [{
-        prompt: prompt
-      }],
-      parameters: {
-        maxOutputTokens: 512,
-        temperature: 0.1,
-        topP: 0.95,
-        topK: 40
-      }
+        "@requestFormat": "chatCompletions",
+        "messages": [
+          {
+            "role": "system",
+            "content": [{"type": "text", "text": "You are an expert medical radiologist. Provide a concise, study-level summary of medical image findings. Output ONLY the summary text, without any preamble, thinking process, or XML-like tags."}]
+          },
+          {
+            "role": "user",
+            "content": [{"type": "text", "text": prompt}]
+          }
+        ],
+        "max_tokens": 512, // As per sample, max_tokens is inside instances
+        // Moving other parameters inside the instance, assuming chatCompletions format applies them here
+        "temperature": 0.1,
+        "topP": 0.95,
+        "topK": 40
+      }]
+      // Parameters moved into the 'instances' object for chatCompletions format
     }
 
     const response = await fetch(endpoint, {
@@ -118,10 +159,14 @@ Study Summary:`
 
     const data: MedGemmaResponse = await response.json()
     
-    // Extract the summary from the response
-    if (data.predictions && data.predictions.length > 0) {
-      return data.predictions[0].text || data.predictions[0].content || 'No summary generated'
+    // Extract the summary from the response (chat completions format)
+    if (data.predictions && data.predictions.choices && data.predictions.choices.length > 0) {
+      const choice = data.predictions.choices[0]
+      if (choice.message && choice.message.content) {
+        return choice.message.content
+      }
     }
+    console.error('Unexpected MedGemma 27B response structure:', JSON.stringify(data, null, 2))
     
     return 'No summary generated'
   } catch (error) {

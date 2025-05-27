@@ -52,29 +52,22 @@ export async function POST(
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
 
-        // Generate new caption - try MedGemma first, fallback to Gemini
+        // Generate raw caption with MedGemma
         let rawCaption: string
-        try {
-          rawCaption = await withRetry(() => 
-            generateImageCaptionMedGemma(base64Image)
-          )
-        } catch (error) {
-          console.log('MedGemma failed, falling back to Gemini for image caption')
-          rawCaption = await withRetry(() => 
-            generateImageCaptionGemini(base64Image)
-          )
-        }
+        rawCaption = await withRetry(() => 
+          generateImageCaptionMedGemma(base64Image)
+        )
 
-        // Enhance the caption using Gemini Flash for better readability
+        // Enhance the caption using Gemini Flash
         let enhancedCaption: string
         try {
           enhancedCaption = await enhanceMedGemmaCaption(rawCaption, image.sliceIndex, study.images.length)
         } catch (error) {
-          console.error('Error enhancing caption:', error)
-          enhancedCaption = rawCaption // Fallback to raw caption
+          console.error(`Error enhancing caption for image ${image.id} with Gemini Flash, using raw caption as fallback:`, error)
+          enhancedCaption = rawCaption // Fallback to raw caption if enhancement fails
         }
 
-        // Update the image record with new captions
+        // Update the image record with new raw and enhanced captions
         const updatedImage = await prisma.image.update({
           where: { id: image.id },
           data: {
@@ -86,20 +79,21 @@ export async function POST(
         return { image: updatedImage, rawCaption, enhancedCaption }
       } catch (error) {
         console.error(`Error processing image ${image.id}:`, error)
-        // Return existing captions if processing fails
+        // Return existing captions if processing fails for this specific image
         return { 
           image, 
           rawCaption: image.sliceCaption, 
-          enhancedCaption: image.enhancedCaption || image.sliceCaption 
+          enhancedCaption: image.enhancedCaption || image.sliceCaption // Use existing enhanced or fallback to raw
         }
       }
     })
 
     // Wait for all images to be processed
     const results = await Promise.all(imagePromises)
-    const enhancedCaptions = results.map(r => r.enhancedCaption)
+    // Use enhanced captions for the primary summary
+    const enhancedCaptions = results.map(r => r.enhancedCaption!) // Non-null assertion as we provide fallbacks
 
-    // Generate new enhanced study summary using Gemini Flash with enhanced captions
+    // Generate study summary using Gemini Flash with enhanced captions
     let seriesSummary: string
     try {
       seriesSummary = await generateEnhancedStudySummary(
@@ -108,18 +102,16 @@ export async function POST(
         study.modality || undefined
       )
     } catch (error) {
-      console.error('Error generating enhanced summary, falling back to standard summary:', error)
-      // Fallback to standard summary generation if enhanced fails
-      const rawCaptions = results.map(r => r.rawCaption)
+      console.error('Error generating enhanced summary with Gemini Flash, falling back to MedGemma 27B:', error)
+      // Fallback to MedGemma 27B summary if Gemini Flash fails
+      const rawCaptions = results.map(r => r.rawCaption) // Use raw captions for MedGemma 27B
       try {
         seriesSummary = await withRetry(() => 
           generateSeriesSummaryMedGemma(rawCaptions)
         )
-      } catch (fallbackError) {
-        console.log('MedGemma 27B failed, falling back to Gemini for series summary')
-        seriesSummary = await withRetry(() => 
-          generateSeriesSummaryGemini(rawCaptions)
-        )
+      } catch (medGemmaError) {
+        console.error('MedGemma 27B summary also failed:', medGemmaError)
+        seriesSummary = "Error: Could not refresh study summary." // Final fallback
       }
     }
 
