@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { FileText, CheckCircle, AlertCircle, ChevronRight, Calendar, User, FileSearch, X, ImageIcon, ExternalLink } from 'lucide-react'
+import { FileText, CheckCircle, AlertCircle, ChevronRight, Calendar, User, FileSearch, X, ImageIcon, ExternalLink, Download } from 'lucide-react'
 
 interface Study {
   id: string
@@ -13,16 +13,19 @@ interface Study {
   seriesSummary: string
 }
 
+interface Report { // Define Report interface if not already globally available
+  id: string;
+  geminiJson: {
+    findings: string;
+    impression: string;
+    next_steps: string;
+    citations?: { [key: string]: string };
+  };
+  createdAt: string;
+}
+
 interface ReportDisplayProps {
-  report: {
-    geminiJson: {
-      findings: string
-      impression: string
-      next_steps: string
-      citations?: { [key: string]: string }
-    }
-    createdAt: string
-  }
+  report: Report;
   patient: {
     name: string
     age: number
@@ -161,11 +164,27 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
       <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg border border-white/20 overflow-hidden">
         {/* Report Header */}
         <div className="bg-gradient-to-r from-medical-primary/20 to-medical-primary-light/15 backdrop-blur-sm border-b border-medical-primary/10 text-medical-primary p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-white/30 backdrop-blur-sm p-2 rounded-lg border border-white/20">
-              <FileText className="w-8 h-8" />
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/30 backdrop-blur-sm p-2 rounded-lg border border-white/20">
+                <FileText className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-bold">Medical Imaging Report</h2>
             </div>
-            <h2 className="text-2xl font-bold">Medical Imaging Report</h2>
+            {report && report.id && (
+              <button
+                onClick={() => {
+                  if (report && report.id) {
+                    window.open(`/api/reports/${report.id}/export-pdf`, '_blank');
+                  }
+                }}
+                className="ml-auto flex items-center gap-2 bg-white/30 backdrop-blur-sm text-medical-primary px-3 py-1.5 rounded-lg border border-white/20 hover:bg-white/40 transition-colors text-sm"
+                title="Export report to PDF"
+              >
+                <Download className="w-4 h-4" />
+                Export PDF
+              </button>
+            )}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm opacity-90">
             <div className="flex items-center gap-2">

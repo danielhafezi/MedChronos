@@ -611,21 +611,6 @@ export default function PatientPage() {
             <MessageSquareText className="w-4 h-4" />
             Chat with Report
           </button>
-          {/* Export to PDF Button */}
-          {latestReport && (
-            <button
-              onClick={() => {
-                if (latestReport && latestReport.id) {
-                  window.open(`/api/reports/${latestReport.id}/export-pdf`, '_blank');
-                }
-              }}
-              className="flex items-center gap-2 bg-medical-warning text-white px-4 py-2 rounded-lg hover:bg-medical-warning-dark disabled:bg-medical-neutral-400"
-              title="Export latest report to PDF"
-            >
-              <Download className="w-4 h-4" />
-              Export PDF
-            </button>
-          )}
         </div>
       </div>
 
