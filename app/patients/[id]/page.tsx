@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw } from 'lucide-react'
+import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText } from 'lucide-react'
 import ReportDisplay from '@/app/components/ReportDisplay'
+import PatientChat from '@/app/components/PatientChat' // Import PatientChat
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -68,6 +69,7 @@ export default function PatientPage() {
   const transformComponentRef = useRef<any>(null)
   const [refreshingStudyId, setRefreshingStudyId] = useState<string | null>(null)
   const [refreshProgress, setRefreshProgress] = useState('')
+  const [isChatOpen, setIsChatOpen] = useState(false) // State for chat panel
 
   // Upload form state
   const [uploadForm, setUploadForm] = useState({
@@ -536,6 +538,14 @@ export default function PatientPage() {
           >
             <FileText className="w-4 h-4" />
             Generate Report
+          </button>
+          <button
+            onClick={() => setIsChatOpen(true)}
+            disabled={!patient || patient.reports.length === 0} // Enable if patient and reports exist
+            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+          >
+            <MessageSquareText className="w-4 h-4" />
+            Chat with Report
           </button>
         </div>
       </div>
@@ -1154,6 +1164,18 @@ export default function PatientPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Chat Panel */}
+      {patient && (
+        <PatientChat
+          patientId={patient.id}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
+          patientName={patient.name}
+          studies={patient.studies}
+          onCitationClick={handleReportCitationClick}
+        />
       )}
     </main>
   )
