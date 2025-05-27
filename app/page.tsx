@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Trash2, Eye } from 'lucide-react'
+import { Plus, Search, Trash2, Eye, FileText, Stethoscope } from 'lucide-react'
+import Breadcrumb from './components/Breadcrumb'
 
 interface Patient {
   id: string
@@ -113,11 +114,16 @@ export default function Dashboard() {
 
       {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Breadcrumb */}
+        <Breadcrumb 
+          items={[{ label: 'Dashboard' }]} 
+          className="mb-6"
+        />
         {/* Controls */}
         <div className="flex justify-between items-center mb-6">
           <button
             onClick={() => setShowNewPatientModal(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center gap-2 bg-medical-primary text-white px-4 py-2 rounded-lg hover:bg-medical-primary-dark transition"
           >
             <Plus className="w-5 h-5" />
             New Patient
@@ -130,7 +136,7 @@ export default function Dashboard() {
               placeholder="Search patients..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-medical-primary"
             />
           </div>
         </div>
@@ -184,9 +190,15 @@ export default function Dashboard() {
                     </p>
                   )}
                   
-                  <div className="flex gap-4 mt-3 text-sm text-gray-500">
-                    <span>{patient._count?.studies || 0} studies</span>
-                    <span>{patient._count?.reports || 0} reports</span>
+                  <div className="flex gap-4 mt-3 text-sm text-medical-neutral-600">
+                    <div className="flex items-center gap-1">
+                      <Stethoscope className="w-4 h-4" />
+                      <span>{patient._count?.studies || 0} studies</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <FileText className="w-4 h-4" />
+                      <span>{patient._count?.reports || 0} reports</span>
+                    </div>
                   </div>
                 </div>
               ))}

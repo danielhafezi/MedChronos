@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, FormEvent } from 'react'
-import { Send, X, MessageCircle, Loader2, History, Plus, Trash2 } from 'lucide-react'
+import { useState, useEffect, useRef, FormEvent, useCallback } from 'react'
+import { Send, X, MessageCircle, Loader2, History, Plus, Trash2, GripVertical } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -51,9 +51,55 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isCreatingChat, setIsCreatingChat] = useState(false)
   const [showWelcomeScreen, setShowWelcomeScreen] = useState(true)
+  const [width, setWidth] = useState(400) // Default width in pixels
+  const [isResizing, setIsResizing] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const historyPanelRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // Min and max width constraints
+  const MIN_WIDTH = 300
+  const MAX_WIDTH = typeof window !== 'undefined' ? Math.min(800, window.innerWidth * 0.6) : 800
+
+  // Resize handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (!isResizing) return
+    
+    const newWidth = window.innerWidth - e.clientX
+    const constrainedWidth = Math.min(Math.max(newWidth, MIN_WIDTH), MAX_WIDTH)
+    setWidth(constrainedWidth)
+  }, [isResizing, MIN_WIDTH, MAX_WIDTH])
+
+  const handleMouseUp = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  // Resize event listeners
+  useEffect(() => {
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing, handleMouseMove, handleMouseUp])
 
   // Suggested questions
   const suggestedQuestions = [
@@ -229,7 +275,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         <sup key={`cite-${match.index}`} className="ml-0.5">
           <button
             onClick={() => onCitationClick(citationIds[0])}
-            className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+            className="text-medical-primary hover:text-medical-primary-dark hover:underline font-medium"
             title={`View study: ${citationIds.map(id => studyMap.get(id)?.title || id).join(', ')}`}
           >
             [{citationNumbers.join(',')}]
@@ -414,9 +460,21 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   if (!isOpen) return null
 
   return (
-    <div ref={chatContainerRef} className="fixed top-0 right-0 h-full w-full md:max-w-md bg-white shadow-xl flex flex-col z-50 md:border-l md:border-gray-200">
+    <div 
+      ref={chatContainerRef} 
+      className="fixed top-0 right-0 h-full bg-white shadow-xl flex flex-col z-50 border-l border-medical-neutral-200"
+      style={{ width: `${width}px` }}
+    >
+      {/* Resize Handle */}
+      <div
+        className="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-medical-primary/20 transition-colors flex items-center justify-center group"
+        onMouseDown={handleMouseDown}
+      >
+        <GripVertical className="w-3 h-3 text-medical-neutral-400 group-hover:text-medical-primary" />
+      </div>
+
       {/* Header */}
-      <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
+      <div className="p-4 bg-gradient-to-r from-medical-primary to-medical-primary-dark text-white">
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center">
             <MessageCircle size={24} className="mr-2" />
@@ -452,37 +510,37 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
 
       {/* Chat History Panel */}
       {showHistory && (
-        <div ref={historyPanelRef} className="absolute top-16 right-4 w-72 max-h-96 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-10">
-          <div className="p-3 border-b border-gray-200 bg-gray-50">
-            <h3 className="font-semibold text-gray-800">Chat History</h3>
+        <div ref={historyPanelRef} className="absolute top-16 right-4 w-72 max-h-96 bg-white shadow-lg rounded-lg border border-medical-neutral-200 overflow-hidden z-10">
+          <div className="p-3 border-b border-medical-neutral-200 bg-medical-neutral-50">
+            <h3 className="font-semibold text-medical-neutral-800">Chat History</h3>
           </div>
           <div className="overflow-y-auto max-h-80">
             {isLoadingHistory ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-medical-neutral-500">
                 <Loader2 size={20} className="animate-spin mx-auto mb-2" />
                 Loading history...
               </div>
             ) : chatHistory.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">
+              <div className="p-4 text-center text-medical-neutral-500">
                 No chat history yet
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-medical-neutral-100">
                 {chatHistory.map((chat) => (
                   <div
                     key={chat.id}
-                    className={`w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
-                      chat.id === currentChat?.id ? 'bg-blue-50' : ''
+                    className={`w-full p-3 text-left hover:bg-medical-neutral-50 transition-colors flex items-center justify-between ${
+                      chat.id === currentChat?.id ? 'bg-medical-primary/10' : ''
                     }`}
                   >
                     <button 
                       onClick={() => loadChat(chat.id)} 
                       className="flex-grow text-left"
                     >
-                      <div className="font-medium text-gray-800 text-sm mb-1 truncate">
+                      <div className="font-medium text-medical-neutral-800 text-sm mb-1 truncate">
                         {chat.title}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-medical-neutral-500">
                         {new Date(chat.updatedAt).toLocaleDateString()} · {chat._count?.messages || 0} messages
                       </div>
                     </button>
@@ -493,7 +551,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                           deleteChat(chat.id)
                         }
                       }}
-                      className="p-1 text-red-500 hover:text-red-700 rounded-md hover:bg-red-100 transition-colors ml-2 flex-shrink-0"
+                      className="p-1 text-medical-error hover:text-medical-error-dark rounded-md hover:bg-medical-error/10 transition-colors ml-2 flex-shrink-0"
                       title="Delete Chat"
                     >
                       <Trash2 size={16} />
@@ -507,20 +565,20 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       )}
 
       {/* Content Area */}
-      <div className="flex-grow flex flex-col bg-gray-50 overflow-hidden">
+      <div className="flex-grow flex flex-col bg-medical-neutral-50 overflow-hidden">
         {showWelcomeScreen ? (
           /* Welcome Screen */
           <div className="flex-grow p-4 space-y-6">
             {/* Suggested Questions */}
             <div className="space-y-3">
-              <h4 className="font-medium text-gray-700">Suggested questions:</h4>
+              <h4 className="font-medium text-medical-neutral-700">Suggested questions:</h4>
               {suggestedQuestions.map((question, index) => (
                 <button
                   key={index}
                   onClick={() => handleSuggestedQuestionClick(question)}
-                  className="w-full text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                  className="w-full text-left p-3 bg-white rounded-lg border border-medical-neutral-200 hover:border-medical-primary hover:bg-medical-primary/5 transition-colors"
                 >
-                  <span className="text-sm text-gray-700">{question}</span>
+                  <span className="text-sm text-medical-neutral-700">{question}</span>
                 </button>
               ))}
             </div>
@@ -528,18 +586,18 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
             {/* Recent Chat History */}
             {chatHistory.length > 0 && (
               <div className="space-y-3">
-                <h4 className="font-medium text-gray-700">Recent conversations:</h4>
+                <h4 className="font-medium text-medical-neutral-700">Recent conversations:</h4>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {chatHistory.slice(0, 5).map((chat) => (
                     <button
                       key={chat.id}
                       onClick={() => loadChat(chat.id)}
-                      className="w-full text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                      className="w-full text-left p-3 bg-white rounded-lg border border-medical-neutral-200 hover:border-medical-primary hover:bg-medical-primary/5 transition-colors"
                     >
-                      <div className="font-medium text-gray-800 text-sm mb-1 truncate">
+                      <div className="font-medium text-medical-neutral-800 text-sm mb-1 truncate">
                         {chat.title}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-medical-neutral-500">
                         {new Date(chat.updatedAt).toLocaleDateString()} · {chat._count?.messages || 0} messages
                       </div>
                     </button>
@@ -556,12 +614,12 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                 <div
                   className={`max-w-[80%] p-3 rounded-lg shadow ${
                     msg.role === 'user'
-                      ? 'bg-blue-500 text-white rounded-br-none'
-                      : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                      ? 'bg-medical-primary text-white rounded-br-none'
+                      : 'bg-white text-medical-neutral-800 rounded-bl-none border border-medical-neutral-200'
                   }`}
                 >
                   {msg.role === 'assistant' ? (
-                    <div className="prose prose-sm max-w-none text-gray-800">
+                    <div className="prose prose-sm max-w-none text-medical-neutral-800">
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -607,7 +665,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
                       </ReactMarkdown>
                     </div>
                   )}
-                  <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-blue-200 text-right' : 'text-gray-500 text-left'}`}>
+                  <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/70 text-right' : 'text-medical-neutral-500 text-left'}`}>
                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                 </div>
@@ -615,9 +673,9 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="max-w-[80%] p-3 rounded-lg shadow bg-gray-200 text-gray-800 rounded-bl-none flex items-center">
-                  <Loader2 size={20} className="animate-spin mr-2 text-gray-500" />
-                  <span className="text-sm text-gray-500">MedChronos AI is typing...</span>
+                <div className="max-w-[80%] p-3 rounded-lg shadow bg-white text-medical-neutral-800 rounded-bl-none flex items-center border border-medical-neutral-200">
+                  <Loader2 size={20} className="animate-spin mr-2 text-medical-primary" />
+                  <span className="text-sm text-medical-neutral-600">MedChronos AI is typing...</span>
                 </div>
               </div>
             )}
@@ -626,19 +684,19 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         )}
 
         {/* Input Area - Always at bottom */}
-        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 bg-white">
+        <form onSubmit={handleSubmit} className="p-4 border-t border-medical-neutral-200 bg-white">
           <div className="flex items-center space-x-2">
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder="Ask about the patient report..."
-              className="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="flex-grow p-2 border border-medical-neutral-300 rounded-lg focus:ring-2 focus:ring-medical-primary focus:border-transparent outline-none"
               disabled={isLoading}
             />
             <button
               type="submit"
-              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center justify-center w-10 h-10"
+              className="p-2 bg-medical-primary text-white rounded-lg hover:bg-medical-primary-dark disabled:bg-medical-neutral-400 flex items-center justify-center w-10 h-10"
               disabled={isLoading || !inputValue.trim()}
             >
               {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}

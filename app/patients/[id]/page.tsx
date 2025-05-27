@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Upload, FileText, Calendar, Trash2, Edit2, Check, X, Image as ImageIcon, ZoomIn, ZoomOut, RotateCw, RefreshCw, MessageSquareText, Monitor, Brain, Zap, Waves, Stethoscope, Clock, MapPin, Download } from 'lucide-react' // Added Download
 import ReportDisplay from '@/app/components/ReportDisplay'
 import PatientChat from '@/app/components/PatientChat' // Import PatientChat
+import Breadcrumb from '@/app/components/Breadcrumb'
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -573,12 +574,23 @@ export default function PatientPage() {
         </div>
       </div>
 
+      {/* Breadcrumb */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <Breadcrumb 
+          items={[
+            { label: patient.name, href: `/patients/${patient.id}` },
+            { label: 'Timeline' }
+          ]} 
+          className="mb-4"
+        />
+      </div>
+
       {/* Actions */}
-      <div className="max-w-7xl mx-auto px-4 py-4">
+      <div className="max-w-7xl mx-auto px-4 py-4 sticky top-0 bg-gray-50 z-40 shadow-sm">
         <div className="flex gap-3">
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            className="flex items-center gap-2 bg-medical-primary text-white px-4 py-2 rounded-lg hover:bg-medical-primary-dark"
           >
             <Upload className="w-4 h-4" />
             Upload Imaging
@@ -586,7 +598,7 @@ export default function PatientPage() {
           <button
             onClick={() => setShowReportModal(true)}
             disabled={patient.studies.length === 0}
-            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+            className="flex items-center gap-2 bg-medical-success text-white px-4 py-2 rounded-lg hover:bg-medical-success-dark disabled:bg-medical-neutral-400"
           >
             <FileText className="w-4 h-4" />
             Generate Report
@@ -594,7 +606,7 @@ export default function PatientPage() {
           <button
             onClick={() => setIsChatOpen(true)}
             disabled={!patient || patient.reports.length === 0} // Enable if patient and reports exist
-            className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+            className="flex items-center gap-2 bg-medical-primary-light text-white px-4 py-2 rounded-lg hover:bg-medical-primary disabled:bg-medical-neutral-400"
           >
             <MessageSquareText className="w-4 h-4" />
             Chat with Report
@@ -607,7 +619,7 @@ export default function PatientPage() {
                   window.open(`/api/reports/${latestReport.id}/export-pdf`, '_blank');
                 }
               }}
-              className="flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 disabled:bg-gray-400"
+              className="flex items-center gap-2 bg-medical-warning text-white px-4 py-2 rounded-lg hover:bg-medical-warning-dark disabled:bg-medical-neutral-400"
               title="Export latest report to PDF"
             >
               <Download className="w-4 h-4" />
