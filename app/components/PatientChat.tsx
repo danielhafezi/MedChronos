@@ -50,7 +50,17 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   const [chatHistory, setChatHistory] = useState<Chat[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [isCreatingChat, setIsCreatingChat] = useState(false)
+  const [showWelcomeScreen, setShowWelcomeScreen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const historyPanelRef = useRef<HTMLDivElement>(null)
+  const chatContainerRef = useRef<HTMLDivElement>(null)
+
+  // Suggested questions
+  const suggestedQuestions = [
+    "What are the key findings in this patient's imaging studies?",
+    "Can you explain the clinical significance of the latest report?",
+    "What follow-up recommendations are suggested for this patient?"
+  ]
 
   // Delete a chat
   const deleteChat = async (chatId: string) => {
@@ -61,13 +71,10 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       if (response.ok) {
         setChatHistory(prev => prev.filter(chat => chat.id !== chatId))
         if (currentChat?.id === chatId) {
-          // If current chat is deleted, load another or create new
-          const nextChat = chatHistory.find(chat => chat.id !== chatId && chat.isActive) || chatHistory.find(chat => chat.id !== chatId)
-          if (nextChat) {
-            loadChat(nextChat.id)
-          } else {
-            createNewChat()
-          }
+          // If current chat is deleted, show welcome screen again
+          setCurrentChat(null)
+          setMessages([])
+          setShowWelcomeScreen(true)
         }
       }
     } catch (error) {
@@ -106,6 +113,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         setCurrentChat(chat)
         setMessages(chat.messages || [])
         setShowHistory(false)
+        setShowWelcomeScreen(false)
         
         // Set this chat as active
         await fetch(`/api/chats/${chatId}`, {
@@ -119,8 +127,8 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
     }
   }
 
-  // Create a new chat
-  const createNewChat = async () => {
+  // Create a new chat (only called after user sends first message)
+  const createNewChatAfterMessage = async (userMessage: Message) => {
     setIsCreatingChat(true)
     try {
       const response = await fetch('/api/chats', {
@@ -132,51 +140,61 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       if (response.ok) {
         const newChat = await response.json()
         setCurrentChat(newChat)
-        setMessages([])
+        setShowWelcomeScreen(false)
         await loadChatHistory() // Refresh history
         
-        // Add welcome message
-        const welcomeMessage = {
-          id: Date.now().toString(),
-          role: 'assistant' as const,
-          content: `Hello! I am MedChronos AI. I can help you discuss ${patientName ? patientName + "'s" : "this patient's"} medical information, including study summaries and the latest report. How can I assist you today?`,
-          createdAt: new Date().toISOString()
-        }
-        setMessages([welcomeMessage])
-        
-        // Save welcome message to database
-        if (newChat.id) {
-          await fetch(`/api/chats/${newChat.id}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              role: 'assistant',
-              content: welcomeMessage.content
-            })
+        // Save the user message to the new chat
+        await fetch(`/api/chats/${newChat.id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: 'user',
+            content: userMessage.content
           })
-        }
+        })
+
+        return newChat
       }
     } catch (error) {
       console.error('Error creating new chat:', error)
     } finally {
       setIsCreatingChat(false)
     }
+    return null
   }
 
-  // Load active chat or create new one on mount
+  // Create a new empty chat (from New Chat button)
+  const createNewChat = async () => {
+    setCurrentChat(null)
+    setMessages([])
+    setShowWelcomeScreen(true)
+    setShowHistory(false)
+  }
+
+  // Load chat history on mount
   useEffect(() => {
-    if (isOpen && !currentChat) {
-      loadChatHistory().then(() => {
-        // Find active chat or create new one
-        const activeChat = chatHistory.find(chat => chat.isActive)
-        if (activeChat) {
-          loadChat(activeChat.id)
-        } else {
-          createNewChat()
-        }
-      })
+    if (isOpen) {
+      loadChatHistory()
     }
   }, [isOpen])
+
+  // Click outside handler for history panel
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showHistory && historyPanelRef.current && !historyPanelRef.current.contains(event.target as Node)) {
+        // Check if the click was on the history button itself
+        const historyButton = document.querySelector('[title="Chat History"]')
+        if (historyButton && !historyButton.contains(event.target as Node)) {
+          setShowHistory(false)
+        }
+      }
+    }
+
+    if (showHistory) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showHistory])
 
   // Process text to replace citations with clickable numbers
   const processCitations = (text: string): JSX.Element[] => {
@@ -239,9 +257,14 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
 
   useEffect(scrollToBottom, [messages])
 
+  // Handle suggested question click
+  const handleSuggestedQuestionClick = (question: string) => {
+    setInputValue(question)
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading || !currentChat) return
+    if (!inputValue.trim() || isLoading) return
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -249,20 +272,31 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       content: inputValue.trim(),
       createdAt: new Date().toISOString()
     }
+    
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setIsLoading(true)
 
     try {
-      // Save user message to database
-      await fetch(`/api/chats/${currentChat.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role: 'user',
-          content: userMessage.content
+      let chatToUse = currentChat
+
+      // If no current chat (welcome screen), create one after first message
+      if (!currentChat) {
+        chatToUse = await createNewChatAfterMessage(userMessage)
+        if (!chatToUse) {
+          throw new Error('Failed to create chat')
+        }
+      } else {
+        // Save user message to existing chat
+        await fetch(`/api/chats/${currentChat.id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role: 'user',
+            content: userMessage.content
+          })
         })
-      })
+      }
 
       // Prepare messages for the API
       const apiMessages = messages.concat(userMessage).map(msg => ({
@@ -325,8 +359,8 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       
       // Final message content is in accumulatedResponse
       // Save AI response to database after stream is complete
-      if (currentChat && accumulatedResponse) {
-        await fetch(`/api/chats/${currentChat.id}/messages`, {
+      if (chatToUse && accumulatedResponse) {
+        await fetch(`/api/chats/${chatToUse.id}/messages`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -337,10 +371,10 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
       }
 
       // Generate a better title after the first real exchange
-      if (messages.length === 1) { // Only welcome message exists
+      if (messages.length === 0 && chatToUse) { // No previous messages (first exchange)
         // Try to generate AI title
         try {
-          const titleResponse = await fetch(`/api/chats/${currentChat.id}/generate-title`, {
+          const titleResponse = await fetch(`/api/chats/${chatToUse.id}/generate-title`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
           })
@@ -356,7 +390,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
           console.error('Error generating title:', titleError)
           // Fallback to simple title
           const title = userMessage.content.slice(0, 50) + (userMessage.content.length > 50 ? '...' : '')
-          await fetch(`/api/chats/${currentChat.id}`, {
+          await fetch(`/api/chats/${chatToUse.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ title })
@@ -380,7 +414,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   if (!isOpen) return null
 
   return (
-    <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col z-50 border-l border-gray-200">
+    <div ref={chatContainerRef} className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col z-50 border-l border-gray-200">
       {/* Header */}
       <div className="p-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white">
         <div className="flex justify-between items-center mb-2">
@@ -418,7 +452,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
 
       {/* Chat History Panel */}
       {showHistory && (
-        <div className="absolute top-16 right-4 w-72 max-h-96 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-10">
+        <div ref={historyPanelRef} className="absolute top-16 right-4 w-72 max-h-96 bg-white shadow-lg rounded-lg border border-gray-200 overflow-hidden z-10">
           <div className="p-3 border-b border-gray-200 bg-gray-50">
             <h3 className="font-semibold text-gray-800">Chat History</h3>
           </div>
@@ -472,101 +506,146 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         </div>
       )}
 
-      {/* Messages Area */}
-      <div className="flex-grow p-4 overflow-y-auto space-y-4 bg-gray-50">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[80%] p-3 rounded-lg shadow ${
-                msg.role === 'user'
-                  ? 'bg-blue-500 text-white rounded-br-none'
-                  : 'bg-gray-200 text-gray-800 rounded-bl-none'
-              }`}
-            >
-              {msg.role === 'assistant' ? (
-                <div className="prose prose-sm max-w-none text-gray-800">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      p: ({ children }: any) => {
-                        const processedChildren = Array.isArray(children) 
-                          ? children.map((child, index) => {
-                              if (typeof child === 'string') {
-                                return <span key={index}>{processCitations(child)}</span>
-                              }
-                              return child
-                            })
-                          : typeof children === 'string' 
-                            ? processCitations(children)
-                            : children
-                        
-                        return <p className="mb-2">{processedChildren}</p>
-                      },
-                      ul: ({ children }: any) => <ul className="list-disc pl-5 space-y-1">{children}</ul>,
-                      ol: ({ children }: any) => <ol className="list-decimal pl-5 space-y-1">{children}</ol>,
-                      li: ({ children }: any) => {
-                        const processedChildren = Array.isArray(children) 
-                          ? children.map((child, index) => {
-                              if (typeof child === 'string') {
-                                return <span key={index}>{processCitations(child)}</span>
-                              }
-                              return child
-                            })
-                          : typeof children === 'string' 
-                            ? processCitations(children)
-                            : children
-                        
-                        return <li>{processedChildren}</li>
-                      },
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
+      {/* Content Area */}
+      <div className="flex-grow flex flex-col bg-gray-50 overflow-hidden">
+        {showWelcomeScreen ? (
+          /* Welcome Screen */
+          <div className="flex-grow p-4 space-y-6">
+            {/* Suggested Questions */}
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-700">Suggested questions:</h4>
+              {suggestedQuestions.map((question, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSuggestedQuestionClick(question)}
+                  className="w-full text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                >
+                  <span className="text-sm text-gray-700">{question}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Recent Chat History */}
+            {chatHistory.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-700">Recent conversations:</h4>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {chatHistory.slice(0, 5).map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => loadChat(chat.id)}
+                      className="w-full text-left p-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                    >
+                      <div className="font-medium text-gray-800 text-sm mb-1 truncate">
+                        {chat.title}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {new Date(chat.updatedAt).toLocaleDateString()} · {chat._count?.messages || 0} messages
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div className="prose prose-sm max-w-none text-white">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {msg.content}
-                  </ReactMarkdown>
-                </div>
-              )}
-              <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-blue-200 text-right' : 'text-gray-500 text-left'}`}>
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
-            </div>
+            )}
           </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="max-w-[80%] p-3 rounded-lg shadow bg-gray-200 text-gray-800 rounded-bl-none flex items-center">
-              <Loader2 size={20} className="animate-spin mr-2 text-gray-500" />
-              <span className="text-sm text-gray-500">MedChronos AI is typing...</span>
-            </div>
+        ) : (
+          /* Messages Area */
+          <div className="flex-grow p-4 overflow-y-auto space-y-4">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg shadow ${
+                    msg.role === 'user'
+                      ? 'bg-blue-500 text-white rounded-br-none'
+                      : 'bg-gray-200 text-gray-800 rounded-bl-none'
+                  }`}
+                >
+                  {msg.role === 'assistant' ? (
+                    <div className="prose prose-sm max-w-none text-gray-800">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          p: ({ children }: any) => {
+                            const processedChildren = Array.isArray(children) 
+                              ? children.map((child, index) => {
+                                  if (typeof child === 'string') {
+                                    return <span key={index}>{processCitations(child)}</span>
+                                  }
+                                  return child
+                                })
+                              : typeof children === 'string' 
+                                ? processCitations(children)
+                                : children
+                            
+                            return <p className="mb-2">{processedChildren}</p>
+                          },
+                          ul: ({ children }: any) => <ul className="list-disc pl-5 space-y-1">{children}</ul>,
+                          ol: ({ children }: any) => <ol className="list-decimal pl-5 space-y-1">{children}</ol>,
+                          li: ({ children }: any) => {
+                            const processedChildren = Array.isArray(children) 
+                              ? children.map((child, index) => {
+                                  if (typeof child === 'string') {
+                                    return <span key={index}>{processCitations(child)}</span>
+                                  }
+                                  return child
+                                })
+                              : typeof children === 'string' 
+                                ? processCitations(children)
+                                : children
+                            
+                            return <li>{processedChildren}</li>
+                          }
+                        }}
+                      >
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="prose prose-sm max-w-none text-white">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {msg.content}
+                      </ReactMarkdown>
+                    </div>
+                  )}
+                  <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-blue-200 text-right' : 'text-gray-500 text-left'}`}>
+                    {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="max-w-[80%] p-3 rounded-lg shadow bg-gray-200 text-gray-800 rounded-bl-none flex items-center">
+                  <Loader2 size={20} className="animate-spin mr-2 text-gray-500" />
+                  <span className="text-sm text-gray-500">MedChronos AI is typing...</span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
         )}
-        <div ref={messagesEndRef} />
-      </div>
 
-      {/* Input Area */}
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 bg-white">
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask about the patient report..."
-            className="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            disabled={isLoading || !currentChat}
-          />
-          <button
-            type="submit"
-            className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center justify-center w-10 h-10"
-            disabled={isLoading || !inputValue.trim() || !currentChat}
-          >
-            {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-          </button>
-        </div>
-      </form>
+        {/* Input Area - Always at bottom */}
+        <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 bg-white">
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Ask about the patient report..."
+              className="flex-grow p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              disabled={isLoading}
+            />
+            <button
+              type="submit"
+              className="p-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-gray-300 flex items-center justify-center w-10 h-10"
+              disabled={isLoading || !inputValue.trim()}
+            >
+              {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
