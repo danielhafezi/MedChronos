@@ -6,10 +6,11 @@ const auth = new GoogleAuth({
   scopes: ['https://www.googleapis.com/auth/cloud-platform']
 })
 
-const PROJECT_ID = process.env.GCP_PROJECT_ID!
+const APP_PROJECT_ID = process.env.GCP_PROJECT_ID! // Renamed to avoid confusion
 const LOCATION = process.env.VERTEX_AI_LOCATION!
+const MEDGEMMA_MODEL_HOST_PROJECT_ID = '744301221446' // Project ID from the sample request URL
 const MEDGEMMA_4B_ENDPOINT_ID = process.env.MEDGEMMA_4B_ENDPOINT_ID!
-const MEDGEMMA_27B_ENDPOINT_ID = process.env.MEDGEMMA_27B_ENDPOINT_ID!
+// const MEDGEMMA_27B_ENDPOINT_ID = process.env.MEDGEMMA_27B_ENDPOINT_ID! // No longer used
 
 interface MedGemmaChatChoice {
   message?: {
@@ -39,8 +40,8 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
     const client = await auth.getClient()
     const accessToken = await client.getAccessToken()
     
-    // Use dedicated endpoint domain for MedGemma 4B
-    const endpoint = `https://${MEDGEMMA_4B_ENDPOINT_ID}.${LOCATION}-744301221446.prediction.vertexai.goog/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_4B_ENDPOINT_ID}:predict`
+    // Construct the endpoint URL based on the sample request provided by the user
+    const endpoint = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${MEDGEMMA_MODEL_HOST_PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_4B_ENDPOINT_ID}:predict`
     
     const requestBody = {
       instances: [{
@@ -88,13 +89,20 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
     console.log('MedGemma 4B Response:', JSON.stringify(data, null, 2))
     
     // Extract the caption from the response (chat completions format)
-    if (data.predictions && typeof data.predictions === 'object' && !Array.isArray(data.predictions) && data.predictions.choices && data.predictions.choices.length > 0) {
-      const choice = data.predictions.choices[0]
-      if (choice.message && choice.message.content) {
+    // Based on logs, data.predictions is an array, where data.predictions[0] is another array,
+    // and data.predictions[0][0] is the object containing the message.
+    if (Array.isArray(data.predictions) && 
+        data.predictions.length > 0 &&
+        Array.isArray(data.predictions[0]) &&
+        data.predictions[0].length > 0) {
+      
+      const choice = data.predictions[0][0] // This should be the object like { message: { content: "..." } }
+      
+      if (choice && choice.message && typeof choice.message.content === 'string') {
         return choice.message.content
       }
     }
-    console.error('Unexpected MedGemma 4B response structure:', JSON.stringify(data, null, 2))
+    console.error('Unexpected MedGemma 4B response structure or empty content:', JSON.stringify(data, null, 2))
     
     return 'No caption generated'
   } catch (error) {
@@ -103,77 +111,8 @@ export async function generateImageCaption(imageBase64: string): Promise<string>
   }
 }
 
-/**
- * Call MedGemma 27B for text summarization
- */
-export async function generateSeriesSummary(sliceCaptions: string[]): Promise<string> {
-  try {
-    const client = await auth.getClient()
-    const accessToken = await client.getAccessToken()
-    
-    // Use dedicated endpoint domain for MedGemma 27B
-    const endpoint = `https://${MEDGEMMA_27B_ENDPOINT_ID}.${LOCATION}-744301221446.prediction.vertexai.goog/v1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${MEDGEMMA_27B_ENDPOINT_ID}:predict`
-    
-    const prompt = `Given the following medical image slice descriptions from a single imaging study, produce a concise study-level summary that captures the key findings, anatomical observations, and any potential abnormalities:
-
-${sliceCaptions.map((caption, index) => `Slice ${index + 1}: ${caption}`).join('\n\n')}
-
-Study Summary:`
-
-    const requestBody = {
-      instances: [{
-        "@requestFormat": "chatCompletions",
-        "messages": [
-          {
-            "role": "system",
-            "content": [{"type": "text", "text": "You are an expert medical radiologist. Provide a concise, study-level summary of medical image findings. Output ONLY the summary text, without any preamble, thinking process, or XML-like tags."}]
-          },
-          {
-            "role": "user",
-            "content": [{"type": "text", "text": prompt}]
-          }
-        ],
-        "max_tokens": 512, // As per sample, max_tokens is inside instances
-        // Moving other parameters inside the instance, assuming chatCompletions format applies them here
-        "temperature": 0.1,
-        "topP": 0.95,
-        "topK": 40
-      }]
-      // Parameters moved into the 'instances' object for chatCompletions format
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('MedGemma 27B Error:', errorText)
-      throw new Error(`MedGemma 27B API error: ${response.status}`)
-    }
-
-    const data: MedGemmaResponse = await response.json()
-    
-    // Extract the summary from the response (chat completions format)
-    if (data.predictions && data.predictions.choices && data.predictions.choices.length > 0) {
-      const choice = data.predictions.choices[0]
-      if (choice.message && choice.message.content) {
-        return choice.message.content
-      }
-    }
-    console.error('Unexpected MedGemma 27B response structure:', JSON.stringify(data, null, 2))
-    
-    return 'No summary generated'
-  } catch (error) {
-    console.error('Error calling MedGemma 27B:', error)
-    throw new Error('Failed to generate series summary')
-  }
-}
+// MedGemma 27B (generateSeriesSummary) is no longer used as per user request.
+// The function has been removed.
 
 /**
  * Retry wrapper for AI calls

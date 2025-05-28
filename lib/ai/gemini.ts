@@ -122,8 +122,8 @@ Be specific and use proper medical terminology. This caption will be used for fu
 
 Analyze this medical image and provide a comprehensive technical description.`
 
-    // Use the vision model with the image
-    const result = await proModel.generateContent([
+    // Use the vision model with the image - Changed to flashModel for MedGemma fallback
+    const result = await flashModel.generateContent([
       prompt,
       {
         inlineData: {

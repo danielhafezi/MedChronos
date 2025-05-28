@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
 import { getSignedUrl } from '@/lib/storage/gcs'
-import { generateImageCaption as generateImageCaptionMedGemma, generateSeriesSummary as generateSeriesSummaryMedGemma, withRetry } from '@/lib/ai/medgemma'
-import { generateImageCaption as generateImageCaptionGemini, generateSeriesSummary as generateSeriesSummaryGemini, enhanceMedGemmaCaption, generateEnhancedStudySummary } from '@/lib/ai/gemini'
+import { generateImageCaption as generateImageCaptionWithMedgemma, withRetry } from '@/lib/ai/medgemma' // Removed generateSeriesSummaryMedGemma
+import { 
+  generateImageCaption as generateImageCaptionWithGeminiFallback, // Aliased for clarity
+  enhanceMedGemmaCaption, 
+  generateEnhancedStudySummary 
+  // generateSeriesSummary as generateSeriesSummaryGemini, // Not used in this file's current logic path
+} from '@/lib/ai/gemini'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for processing
@@ -52,11 +57,22 @@ export async function POST(
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
 
-        // Generate raw caption with MedGemma
-        let rawCaption: string
-        rawCaption = await withRetry(() => 
-          generateImageCaptionMedGemma(base64Image)
-        )
+        // Generate raw caption with MedGemma, fallback to Gemini Flash
+        let rawCaptionAttempt: string | null = null;
+        try {
+          rawCaptionAttempt = await withRetry(() => generateImageCaptionWithMedgemma(base64Image));
+        } catch (medgemmaError) {
+          console.error(`MedGemma 4B captioning failed for image ${image.id}, falling back to Gemini Flash:`, medgemmaError);
+          try {
+            rawCaptionAttempt = await withRetry(() => generateImageCaptionWithGeminiFallback(base64Image));
+          } catch (geminiFallbackError) {
+            console.error(`Gemini Flash captioning fallback also failed for image ${image.id}:`, geminiFallbackError);
+            // If both fail during refresh, we might want to keep the old caption or use an error string.
+            // For now, let's use an error string to make it clear refresh failed for this caption.
+            rawCaptionAttempt = "Caption refresh failed for this image."; 
+          }
+        }
+        const rawCaption = rawCaptionAttempt || image.sliceCaption || "Caption not available."; // Fallback to existing if all else fails
 
         // Enhance the caption using Gemini Flash
         let enhancedCaption: string
@@ -102,17 +118,8 @@ export async function POST(
         study.modality || undefined
       )
     } catch (error) {
-      console.error('Error generating enhanced summary with Gemini Flash, falling back to MedGemma 27B:', error)
-      // Fallback to MedGemma 27B summary if Gemini Flash fails
-      const rawCaptions = results.map(r => r.rawCaption) // Use raw captions for MedGemma 27B
-      try {
-        seriesSummary = await withRetry(() => 
-          generateSeriesSummaryMedGemma(rawCaptions)
-        )
-      } catch (medGemmaError) {
-        console.error('MedGemma 27B summary also failed:', medGemmaError)
-        seriesSummary = "Error: Could not refresh study summary." // Final fallback
-      }
+      console.error('Error generating study summary with Gemini Flash during refresh:', error);
+      seriesSummary = "Error: Could not refresh study summary."; // Hardcoded fallback, MedGemma 27B removed
     }
 
     // Update study with new summary
