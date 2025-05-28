@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'MedChronos',
   description: 'Medical imaging timeline and AI-powered insights',
+  icons: {
+    icon: '/images/logo.png', // Path to your logo in the public directory
+  },
 }
 
 export default function RootLayout({
