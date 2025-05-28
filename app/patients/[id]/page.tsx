@@ -33,10 +33,9 @@ interface Study {
 interface Image {
   id: string
   gcsUrl: string
-  signedUrl: string // Changed from publicUrl to signedUrl
+  signedUrl: string
   sliceIndex: number
-  sliceCaption: string
-  enhancedCaption?: string | null
+  sliceCaption: string // This now holds the primary, high-quality caption
 }
 
 interface Report {
@@ -1054,7 +1053,7 @@ export default function PatientPage() {
                           Slice {image.sliceIndex + 1}
                         </p>
                         <p className="text-sm text-gray-700">
-                          {image.enhancedCaption || image.sliceCaption}
+                          {image.sliceCaption}
                         </p>
                       </div>
                       <div className="ml-4 flex-shrink-0">
@@ -1269,19 +1268,10 @@ export default function PatientPage() {
             </div>
             
             <div className="bg-white rounded-b-lg p-4 max-h-[25vh] overflow-y-auto">
-              <h4 className="font-medium mb-2">Enhanced Caption</h4>
+              <h4 className="font-medium mb-2">Caption</h4>
               <p className="text-sm text-gray-700 mb-4">
-                {selectedImage.enhancedCaption || selectedImage.sliceCaption}
+                {selectedImage.sliceCaption}
               </p>
-              
-              <details className="text-sm">
-                <summary className="cursor-pointer text-gray-600 hover:text-gray-800">
-                  View Original Caption
-                </summary>
-                <p className="mt-2 text-gray-600">
-                  {selectedImage.sliceCaption}
-                </p>
-              </details>
             </div>
           </div>
         </div>

@@ -49,7 +49,6 @@ model Image {
   gcsUrl           String   @map("gcs_url")
   sliceIndex       Int      @map("slice_index")
   sliceCaption     String   @map("slice_caption")
-  enhancedCaption  String?  @map("enhanced_caption")
   createdAt        DateTime @default(now()) @map("created_at")
   
   study            Study    @relation(fields: [studyId], references: [id], onDelete: Cascade)

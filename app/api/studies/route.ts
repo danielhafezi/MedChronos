@@ -2,14 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
 import { uploadToGCS } from '@/lib/storage/gcs'
 import { processImage, isValidImageFormat } from '@/lib/utils/image-processing'
-import { generateImageCaption as generateImageCaptionWithMedgemma, withRetry } from '@/lib/ai/medgemma' // Removed generateSeriesSummaryMedGemma
+import { withRetry } from '@/lib/utils/retry' // Updated import path for withRetry
 import { 
   generateStudyTitle, 
   extractImagingDate, 
   extractImagingModality, 
-  generateImageCaption as generateImageCaptionWithGeminiFallback, // Aliased for clarity
-  enhanceMedGemmaCaption, // Name can be kept, or generalized later if needed
-  generateEnhancedStudySummary 
+  generateImageCaption, // This is now the primary caption generator
+  generateStudySummary // Renamed from generateEnhancedStudySummary
   // generateSeriesSummary as generateSeriesSummaryGemini, // Not used in this file's current logic path
 } from '@/lib/ai/gemini'
 
@@ -176,60 +175,46 @@ export async function POST(request: NextRequest) {
           `patients/${patientId}/studies/${study.id}`
         )
 
-        // Generate raw caption with MedGemma, fallback to Gemini Flash
-        let rawCaptionAttempt: string | null = null;
+        // Generate caption using Gemini Flash
+        let sliceCaptionAttempt: string | null = null;
         try {
-          rawCaptionAttempt = await withRetry(() => generateImageCaptionWithMedgemma(processed.base64));
-        } catch (medgemmaError) {
-          console.error(`MedGemma 4B captioning failed for image ${index + 1}, falling back to Gemini Flash:`, medgemmaError);
-          try {
-            rawCaptionAttempt = await withRetry(() => generateImageCaptionWithGeminiFallback(processed.base64));
-          } catch (geminiFallbackError) {
-            console.error(`Gemini Flash captioning fallback also failed for image ${index + 1}:`, geminiFallbackError);
-            rawCaptionAttempt = "Caption generation failed for this image."; 
-          }
+          // generateImageCaption now takes 3 arguments: imageBase64, sliceIndex, totalSlices
+          sliceCaptionAttempt = await withRetry(() => generateImageCaption(processed.base64, index, files.length));
+        } catch (captionError) {
+          console.error(`Gemini Flash captioning failed for image ${index + 1}:`, captionError);
+          sliceCaptionAttempt = "Caption generation failed for this image.";
         }
-        const rawCaption = rawCaptionAttempt || "Caption not available.";
+        const sliceCaption = sliceCaptionAttempt || "Caption not available.";
 
-        // Enhance the caption using Gemini Flash
-        let enhancedCaption: string
-        try {
-          enhancedCaption = await enhanceMedGemmaCaption(rawCaption, index, files.length)
-        } catch (error) {
-          console.error('Error enhancing caption with Gemini Flash, using raw caption as fallback:', error)
-          enhancedCaption = rawCaption // Fallback to raw caption if enhancement fails
-        }
-
-        // Save image record with both captions
+        // Save image record
         const image = await prisma.image.create({
           data: {
             studyId: study.id,
             gcsUrl: uploadResult.gcsUrl,
             sliceIndex: index,
-            sliceCaption: rawCaption,
-            enhancedCaption: enhancedCaption
+            sliceCaption: sliceCaption
           }
         })
 
-        return { image, rawCaption, enhancedCaption }
+        return { image, sliceCaption } // Return sliceCaption
       })
 
       // Wait for all images to be processed
       const results = await Promise.all(imagePromises)
-      // Use enhanced captions for the primary summary
-      const enhancedCaptions = results.map(r => r.enhancedCaption)
+      // Use slice captions for the summary
+      const sliceCaptions = results.map(r => r.sliceCaption)
 
-      // Generate study summary using Gemini Flash with enhanced captions
+      // Generate study summary using Gemini Flash with slice captions
       let seriesSummary: string
       try {
-        seriesSummary = await generateEnhancedStudySummary(
-          enhancedCaptions,
+        seriesSummary = await generateStudySummary( // Renamed function
+          sliceCaptions,
           finalTitle, // Use the determined finalTitle for the study
           finalModality || undefined // Use the determined finalModality
         )
       } catch (error) {
         console.error('Error generating study summary with Gemini Flash:', error);
-        seriesSummary = "Error: Could not generate study summary."; // Hardcoded fallback, MedGemma 27B removed
+        seriesSummary = "Error: Could not generate study summary."; 
       }
 
       // Update study with summary

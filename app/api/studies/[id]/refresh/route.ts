@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
 import { getSignedUrl } from '@/lib/storage/gcs'
-import { generateImageCaption as generateImageCaptionWithMedgemma, withRetry } from '@/lib/ai/medgemma' // Removed generateSeriesSummaryMedGemma
+import { withRetry } from '@/lib/utils/retry' // Updated import path for withRetry
 import { 
-  generateImageCaption as generateImageCaptionWithGeminiFallback, // Aliased for clarity
-  enhanceMedGemmaCaption, 
-  generateEnhancedStudySummary 
+  generateImageCaption, // This is now the primary caption generator
+  generateStudySummary // Renamed from generateEnhancedStudySummary
   // generateSeriesSummary as generateSeriesSummaryGemini, // Not used in this file's current logic path
 } from '@/lib/ai/gemini'
 
@@ -57,69 +56,54 @@ export async function POST(
         const imageBuffer = await imageResponse.arrayBuffer()
         const base64Image = Buffer.from(imageBuffer).toString('base64')
 
-        // Generate raw caption with MedGemma, fallback to Gemini Flash
-        let rawCaptionAttempt: string | null = null;
+        // Generate caption using Gemini Flash
+        let sliceCaptionAttempt: string | null = null;
         try {
-          rawCaptionAttempt = await withRetry(() => generateImageCaptionWithMedgemma(base64Image));
-        } catch (medgemmaError) {
-          console.error(`MedGemma 4B captioning failed for image ${image.id}, falling back to Gemini Flash:`, medgemmaError);
-          try {
-            rawCaptionAttempt = await withRetry(() => generateImageCaptionWithGeminiFallback(base64Image));
-          } catch (geminiFallbackError) {
-            console.error(`Gemini Flash captioning fallback also failed for image ${image.id}:`, geminiFallbackError);
-            // If both fail during refresh, we might want to keep the old caption or use an error string.
-            // For now, let's use an error string to make it clear refresh failed for this caption.
-            rawCaptionAttempt = "Caption refresh failed for this image."; 
-          }
+          // generateImageCaption now takes 3 arguments: imageBase64, sliceIndex, totalSlices
+          sliceCaptionAttempt = await withRetry(() => generateImageCaption(base64Image, image.sliceIndex, study.images.length));
+        } catch (captionError) {
+          console.error(`Gemini Flash captioning failed for image ${image.id}:`, captionError);
+          sliceCaptionAttempt = "Caption refresh failed for this image.";
         }
-        const rawCaption = rawCaptionAttempt || image.sliceCaption || "Caption not available."; // Fallback to existing if all else fails
+        // Fallback to existing caption if refresh fails, otherwise use the new one or error string
+        const sliceCaption = sliceCaptionAttempt || image.sliceCaption || "Caption not available.";
 
-        // Enhance the caption using Gemini Flash
-        let enhancedCaption: string
-        try {
-          enhancedCaption = await enhanceMedGemmaCaption(rawCaption, image.sliceIndex, study.images.length)
-        } catch (error) {
-          console.error(`Error enhancing caption for image ${image.id} with Gemini Flash, using raw caption as fallback:`, error)
-          enhancedCaption = rawCaption // Fallback to raw caption if enhancement fails
-        }
 
-        // Update the image record with new raw and enhanced captions
+        // Update the image record
         const updatedImage = await prisma.image.update({
           where: { id: image.id },
           data: {
-            sliceCaption: rawCaption,
-            enhancedCaption: enhancedCaption
+            sliceCaption: sliceCaption
           }
         })
 
-        return { image: updatedImage, rawCaption, enhancedCaption }
+        return { image: updatedImage, sliceCaption } // Return sliceCaption
       } catch (error) {
         console.error(`Error processing image ${image.id}:`, error)
-        // Return existing captions if processing fails for this specific image
+        // Return existing sliceCaption if processing fails for this specific image
         return { 
           image, 
-          rawCaption: image.sliceCaption, 
-          enhancedCaption: image.enhancedCaption || image.sliceCaption // Use existing enhanced or fallback to raw
+          sliceCaption: image.sliceCaption, 
         }
       }
     })
 
     // Wait for all images to be processed
     const results = await Promise.all(imagePromises)
-    // Use enhanced captions for the primary summary
-    const enhancedCaptions = results.map(r => r.enhancedCaption!) // Non-null assertion as we provide fallbacks
+    // Use slice captions for the summary
+    const sliceCaptions = results.map(r => r.sliceCaption!) // Non-null assertion as we provide fallbacks
 
-    // Generate study summary using Gemini Flash with enhanced captions
+    // Generate study summary using Gemini Flash with slice captions
     let seriesSummary: string
     try {
-      seriesSummary = await generateEnhancedStudySummary(
-        enhancedCaptions,
+      seriesSummary = await generateStudySummary( // Renamed function
+        sliceCaptions,
         study.title,
         study.modality || undefined
       )
     } catch (error) {
       console.error('Error generating study summary with Gemini Flash during refresh:', error);
-      seriesSummary = "Error: Could not refresh study summary."; // Hardcoded fallback, MedGemma 27B removed
+      seriesSummary = "Error: Could not refresh study summary."; 
     }
 
     // Update study with new summary
