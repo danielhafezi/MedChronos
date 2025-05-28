@@ -568,35 +568,18 @@ export default function PatientPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/')}
-              className="p-2 hover:bg-gray-100 rounded-lg"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{patient.name}</h1>
-              <p className="text-sm text-gray-600">
-                {patient.age} years • {patient.sex === 'M' ? 'Male' : patient.sex === 'F' ? 'Female' : 'Other'}
-                {patient.mrn && ` • MRN: ${patient.mrn}`}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Breadcrumb */}
-      <div className="max-w-7xl mx-auto px-4 pt-4">
+      {/* Breadcrumb and Patient Info */}
+      <div className="max-w-7xl mx-auto px-4 pt-4 flex justify-between items-center">
         <Breadcrumb 
           items={[
-            { label: patient.name } // Display patient name as the current page
+            { label: patient.name } 
           ]} 
-          className="mb-4"
+          className="mb-4 flex-grow"
         />
+        <div className="text-sm text-gray-600 ml-4">
+          {patient.age} years • {patient.sex === 'M' ? 'Male' : patient.sex === 'F' ? 'Female' : 'Other'}
+          {patient.mrn && ` • MRN: ${patient.mrn}`}
+        </div>
       </div>
 
       {/* Actions */}

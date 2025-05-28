@@ -104,14 +104,6 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">MedChronos</h1>
-          <p className="text-sm text-gray-600">Medical Imaging Timeline & AI Insights</p>
-        </div>
-      </div>
-
       {/* Dashboard Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Breadcrumb */}
