@@ -248,7 +248,7 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
     let lastIndex = 0
     
     const citationPattern = /\[CITE:([^\]]+)\]/g
-    let match
+    let match: RegExpExecArray | null;
     let citationNumber = 1
     const usedCitations = new Map<string, number>()
     
@@ -271,19 +271,30 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
         citationNumbers.push(usedCitations.get(studyId)!)
       })
       
-      parts.push(
-        <sup key={`cite-${match.index}`} className="ml-0.5">
-          <button
-            onClick={() => onCitationClick(citationIds[0])}
-            className="text-medical-primary hover:text-medical-primary-dark hover:underline font-medium"
-            title={`View study: ${citationIds.map(id => studyMap.get(id)?.title || id).join(', ')}`}
-          >
-            [{citationNumbers.join(',')}]
-          </button>
-        </sup>
-      )
+      citationIds.forEach((studyId, index) => {
+        const currentCitationNumber = citationNumbers[index];
+        if (match) { // Add null check for match
+          parts.push(
+            <sup key={`cite-${match.index}-${index}`} className="ml-0.5">
+              <button
+                onClick={() => onCitationClick(studyId)}
+                className="text-medical-primary hover:text-medical-primary-dark hover:underline font-medium"
+                title={`View study: ${studyMap.get(studyId)?.title || studyId}`}
+              >
+                [{currentCitationNumber}]
+              </button>
+            </sup>
+          );
+          // If it's not the last citation in this group, add a comma and space
+          if (index < citationIds.length - 1) {
+            parts.push(<span key={`sep-${match.index}-${index}`}>, </span>);
+          }
+        }
+      });
       
-      lastIndex = match.index + match[0].length
+      if (match) { // Add null check for match
+        lastIndex = match.index + match[0].length
+      }
     }
     
     if (lastIndex < text.length) {
