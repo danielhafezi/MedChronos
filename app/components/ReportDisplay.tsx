@@ -47,8 +47,8 @@ export default function ReportDisplay({ report, patient, studies = [], onCitatio
   const citationMap = report.geminiJson.citations || {}
   
   // Process text to replace citations with clickable numbers
-  const processCitations = (text: string): JSX.Element[] => {
-    const parts: JSX.Element[] = []
+  const processCitations = (text: string): React.ReactElement[] => {
+    const parts: React.ReactElement[] = []
     let lastIndex = 0
     
     // Find all citations in the text

@@ -12,10 +12,8 @@ export const runtime = 'nodejs'
 export const maxDuration = 300 // 5 minutes for processing
 
 // POST /api/studies/[id]/refresh - Refresh AI captions and summary for existing study
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // Fetch the study with images
     const study = await prisma.study.findUnique({

@@ -5,10 +5,8 @@ import { prisma } from '@/lib/db/client'
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 const flashModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-05-20' })
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { chatId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { chatId } = params
 

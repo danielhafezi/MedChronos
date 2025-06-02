@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/client';
 
-export async function GET(
-  request: Request,
-  { params }: { params: { reportId: string } }
-) {
+export async function GET(request: Request, props: { params: Promise<{ reportId: string }> }) {
+  const params = await props.params;
   const { reportId } = params;
 
   if (!reportId) {

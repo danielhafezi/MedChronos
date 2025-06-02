@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/client'
 
 // GET /api/studies/[id] - Get a specific study
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const study = await prisma.study.findUnique({
       where: { id: params.id },
@@ -32,10 +30,8 @@ export async function GET(
 }
 
 // PATCH /api/studies/[id] - Update a study
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const body = await request.json()
     const { title, modality, imagingDatetime } = body
@@ -75,10 +71,8 @@ export async function PATCH(
 }
 
 // DELETE /api/studies/[id] - Delete a study
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // The study deletion will cascade to images due to the onDelete: Cascade in the schema
     await prisma.study.delete({

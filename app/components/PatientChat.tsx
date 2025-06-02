@@ -243,8 +243,8 @@ const PatientChat: React.FC<PatientChatProps> = ({ patientId, isOpen, onClose, p
   }, [showHistory])
 
   // Process text to replace citations with clickable numbers
-  const processCitations = (text: string): JSX.Element[] => {
-    const parts: JSX.Element[] = []
+  const processCitations = (text: string): React.ReactElement[] => {
+    const parts: React.ReactElement[] = []
     let lastIndex = 0
     
     const citationPattern = /\[CITE:([^\]]+)\]/g

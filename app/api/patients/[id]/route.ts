@@ -3,10 +3,8 @@ import { prisma } from '@/lib/db/client'
 import { deleteFolder, getSignedUrl } from '@/lib/storage/gcs'
 
 // GET /api/patients/[id] - Get a specific patient with studies
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const patient = await prisma.patient.findUnique({
       where: { id: params.id },
@@ -57,10 +55,8 @@ export async function GET(
 }
 
 // DELETE /api/patients/[id] - Delete a patient and all associated data
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     // Check if patient exists
     const patient = await prisma.patient.findUnique({

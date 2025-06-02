@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import ReportDisplay from '@/app/components/ReportDisplay';
 import { Patient, Report, Study } from '@prisma/client'; // Assuming these types exist
 
@@ -15,12 +15,13 @@ interface ReportWithDetails extends Report {
 }
 
 interface PrintReportPageProps {
-  params: {
+  params: Promise<{
     reportId: string;
-  };
+  }>;
 }
 
-export default function PrintReportPage({ params }: PrintReportPageProps) {
+export default function PrintReportPage(props: PrintReportPageProps) {
+  const params = use(props.params);
   const { reportId } = params;
   const [reportData, setReportData] = useState<ReportWithDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +96,7 @@ export default function PrintReportPage({ params }: PrintReportPageProps) {
     <div style={{ margin: '0 auto', padding: '10px' }}> {/* Basic styling for print */}
       <ReportDisplay
         report={{
+          id: reportData.id,
           geminiJson: geminiJsonForDisplay,
           createdAt: new Date(reportData.createdAt).toLocaleDateString(), // Format Date to string
         }}

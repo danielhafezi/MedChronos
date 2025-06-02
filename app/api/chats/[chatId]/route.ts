@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 
 // GET /api/chats/[chatId] - Get a specific chat with all messages
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { chatId: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const chat = await prisma.chat.findUnique({
       where: { id: params.chatId },
@@ -31,10 +29,8 @@ export async function GET(
 }
 
 // PATCH /api/chats/[chatId] - Update chat (e.g., set as active)
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { chatId: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { isActive, title } = await request.json();
 
@@ -72,10 +68,8 @@ export async function PATCH(
 }
 
 // DELETE /api/chats/[chatId] - Delete a chat
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { chatId: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     await prisma.chat.delete({
       where: { id: params.chatId },

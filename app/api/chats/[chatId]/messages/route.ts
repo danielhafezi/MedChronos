@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/client";
 
 // POST /api/chats/[chatId]/messages - Add a message to a chat
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { chatId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ chatId: string }> }) {
+  const params = await props.params;
   try {
     const { role, content } = await request.json();
 
