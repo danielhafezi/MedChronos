@@ -127,7 +127,7 @@ export default function PatientPage() {
   const [uploadForm, setUploadForm] = useState({
     title: '',
     modality: '',
-    imagingDatetime: new Date().toISOString().slice(0, 16),
+    imagingDatetime: new Date().toISOString().slice(0, 10), // Changed to date only
     files: [] as File[],
     autoGenerateTitle: false,
     autoExtractDate: false,
@@ -161,7 +161,10 @@ export default function PatientPage() {
       formData.append('patientId', params.id as string)
       formData.append('title', uploadForm.title)
       formData.append('modality', uploadForm.modality)
-      formData.append('imagingDatetime', uploadForm.imagingDatetime)
+      // Ensure a full ISO string is sent, defaulting to midnight UTC if only date is present
+      const imagingDate = uploadForm.autoExtractDate ? new Date().toISOString().slice(0,10) : uploadForm.imagingDatetime;
+      const fullImagingDatetime = imagingDate.includes('T') ? imagingDate : `${imagingDate}T00:00:00.000Z`;
+      formData.append('imagingDatetime', fullImagingDatetime)
       formData.append('autoGenerateTitle', uploadForm.autoGenerateTitle.toString())
       formData.append('autoExtractDate', uploadForm.autoExtractDate.toString())
       formData.append('autoExtractModality', uploadForm.autoExtractModality.toString())
@@ -182,7 +185,7 @@ export default function PatientPage() {
         setUploadForm({
           title: '',
           modality: '',
-          imagingDatetime: new Date().toISOString().slice(0, 16),
+          imagingDatetime: new Date().toISOString().slice(0, 10), // Changed to date only
           files: [],
           autoGenerateTitle: false,
           autoExtractDate: false,
@@ -280,7 +283,7 @@ export default function PatientPage() {
     setEditForm({
       title: study.title,
       modality: study.modality || '',
-      imagingDatetime: new Date(study.imagingDatetime).toISOString().slice(0, 16)
+      imagingDatetime: new Date(study.imagingDatetime).toISOString().slice(0, 10) // Changed to date only for edit form
     })
     setShowEditModal(true)
   }
@@ -816,7 +819,7 @@ export default function PatientPage() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="block text-sm font-medium text-gray-700">
-                      Imaging Date/Time *
+                      Imaging Date *
                     </label>
                     <label className="flex items-center gap-2 text-sm">
                       <input
@@ -829,7 +832,7 @@ export default function PatientPage() {
                     </label>
                   </div>
                   <input
-                    type="datetime-local"
+                    type="date" // Changed to date type
                     required={!uploadForm.autoExtractDate}
                     disabled={uploadForm.autoExtractDate}
                     value={uploadForm.imagingDatetime}
@@ -1126,10 +1129,10 @@ export default function PatientPage() {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Imaging Date/Time *
+                    Imaging Date *
                   </label>
                   <input
-                    type="datetime-local"
+                    type="date" // Changed to date type
                     required
                     value={editForm.imagingDatetime}
                     onChange={(e) => setEditForm({ ...editForm, imagingDatetime: e.target.value })}
