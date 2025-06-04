@@ -133,9 +133,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Patients */}
+        {/* Patients List */}
         <div>
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Patients</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Patients</h2>
           
           {loading ? (
             <div className="text-center py-8 text-gray-500">Loading...</div>

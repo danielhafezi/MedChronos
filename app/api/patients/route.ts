@@ -6,7 +6,7 @@ export async function GET() {
   try {
     const patients = await prisma.patient.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 6, // Recent 6 patients as per PRD
+      // take: 6, // Recent 6 patients as per PRD - Removed to fetch all patients
       include: {
         _count: {
           select: {
