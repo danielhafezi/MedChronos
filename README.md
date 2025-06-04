@@ -93,21 +93,34 @@ Being **open-source**, MedChronos invites developers, clinicians, and researcher
 *   Git
 
 ### Environment Variables
-Create a `.env` file in the root directory and populate it with your credentials:
+Create a `.env` file in the root directory by copying the `.env.example` template:
+
+```bash
+cp .env.example .env
+```
+
+Then, populate the `.env` file with your actual credentials. 
+**Important**: Ensure your `.env` file is listed in `.gitignore` (it should be by default) and is **never committed to version control.**
+
+The required variables are:
 ```env
 # Database
-DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require"
 
 # Google Cloud
-GOOGLE_APPLICATION_CREDENTIALS=./path-to-your-gcp-key.json
-GCP_PROJECT_ID=your-gcp-project-id
-GCS_BUCKET_NAME=your-gcs-bucket-name
+GOOGLE_APPLICATION_CREDENTIALS="./path-to-your-gcp-key.json" # e.g., ./medchronos-key.json
+GCP_PROJECT_ID="your-gcp-project-id"
+GCS_BUCKET_NAME="your-gcs-bucket-name"
 
 # Vertex AI (Location might be needed for other Vertex services)
-VERTEX_AI_LOCATION=us-central1 
+VERTEX_AI_LOCATION="us-central1" 
 
 # Gemini API
-GEMINI_API_KEY=your-gemini-api-key
+GEMINI_API_KEY="your-gemini-api-key"
+
+# Application URL (Optional, but recommended for some features like PDF export if absolute URLs are needed)
+# The base URL of your deployed application (e.g., http://localhost:3000 for local development)
+# NEXT_PUBLIC_APP_URL="http://localhost:3000" 
 ```
 
 ### Installation & Running Locally
