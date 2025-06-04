@@ -563,9 +563,11 @@ export default function PatientPage() {
   const latestReport = patient.reports[0]
 
   const handleReportCitationClick = (studyId: string) => {
-    const study = patient?.studies.find(s => s.id === studyId)
+    const study = patient?.studies.find(s => s.id.toLowerCase() === studyId.toLowerCase())
     if (study) {
       setSelectedStudy(study)
+    } else {
+      console.warn(`Clicked citation for studyId "${studyId}", but it was not found in patient.studies.`)
     }
   }
 
